@@ -80,6 +80,12 @@ class TaskStep(models.Model):
         'Инструкция',
         help_text='Текст, который увидит пользователь',
     )
+    image = models.ImageField(
+        'Изображение',
+        upload_to='task_steps/',
+        blank=True,
+        help_text='Опциональная картинка-инструкция для шага',
+    )
     settings = models.JSONField(
         'Настройки',
         default=dict,

@@ -154,10 +154,50 @@ async def show_current_step(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     chat_id = update.effective_chat.id
     schedule_reminder(context, buyback.id, chat_id)
 
+    # Проверяем есть ли изображение у шага
+    has_image = step.image and step.image.name
+
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode='HTML', reply_markup=keyboard)
+        # Удаляем предыдущее сообщение
+        try:
+            await update.callback_query.delete_message()
+        except Exception:
+            pass
+
+        if has_image:
+            # Отправляем фото с подписью
+            image_path = step.image.path
+            with open(image_path, 'rb') as photo:
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=photo,
+                    caption=text,
+                    parse_mode='HTML',
+                    reply_markup=keyboard,
+                )
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                parse_mode='HTML',
+                reply_markup=keyboard,
+            )
     else:
-        await update.message.reply_text(text, parse_mode='HTML', reply_markup=keyboard)
+        if has_image:
+            image_path = step.image.path
+            with open(image_path, 'rb') as photo:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=text,
+                    parse_mode='HTML',
+                    reply_markup=keyboard,
+                )
+        else:
+            await update.message.reply_text(
+                text=text,
+                parse_mode='HTML',
+                reply_markup=keyboard,
+            )
 
     return STEP_RESPONSE
 
@@ -240,7 +280,7 @@ async def handle_step_response(update: Update, context: ContextTypes.DEFAULT_TYP
         return ConversationHandler.END
 
     try:
-        buyback = await Buyback.objects.select_related('task', 'user').aget(id=buyback_id)
+        buyback = await Buyback.objects.select_related('task__product', 'user').aget(id=buyback_id)
         step = await TaskStep.objects.aget(id=step_id)
     except (Buyback.DoesNotExist, TaskStep.DoesNotExist):
         await update.message.reply_text('⚠️ Ошибка. Начни заново через меню.')
@@ -267,13 +307,20 @@ async def handle_step_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
         response_data = {'photo': file_path}
 
+
     elif step_type == TaskStep.StepType.ARTICLE_CHECK:
+
         text = update.message.text.strip()
-        correct_article = step.settings.get('correct_article', '')
+
+        # Берём артикул из settings (override) или из товара
+
+        correct_article = step.settings.get('correct_article') or buyback.task.product.wb_article
 
         if text != correct_article:
             await update.message.reply_text('❌ Артикул не совпадает. Проверь и введи ещё раз.')
+
             schedule_reminder(context, buyback_id, update.effective_chat.id)
+
             return STEP_RESPONSE
 
         response_data = {'value': text}

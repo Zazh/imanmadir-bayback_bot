@@ -65,7 +65,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Если уже прошёл онбординг — просто приветствие
-    text = f'👋 С возвращением, {user.display_name}!'
+    text = f'👋 С возвращением, {user.display_name}! Выберите в меню себе задание!'
     await update.message.reply_text(text, reply_markup=main_menu_keyboard())
 
 
