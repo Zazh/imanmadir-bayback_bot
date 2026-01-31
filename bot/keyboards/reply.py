@@ -1,0 +1,11 @@
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+
+
+def main_menu_keyboard():
+    """Главное меню"""
+    keyboard = [
+        [KeyboardButton('📋 Доступные задания')],
+        [KeyboardButton('📦 Мои выкупы')],
+        [KeyboardButton('👤 Профиль'), KeyboardButton('❓ Помощь')],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

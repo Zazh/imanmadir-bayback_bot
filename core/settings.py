@@ -23,6 +23,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third party
     'corsheaders',
+    'account',
+    'catalog',
+    'tasks',
+    'bot',
+
 ]
 
 MIDDLEWARE = [
@@ -76,9 +81,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# Telegram Bot
+BOT_TOKEN = config('BOT_TOKEN')
+MANAGER_USERNAME = config('MANAGER_USERNAME', default='manager')
+DOCUMENTS_URL = config('DOCUMENTS_URL', default='https://drive.google.com/drive/folders/135ZcME2o1n4i--OXHn4-3FHM3BfRhN-Z')
+
+
 # Internationalization
 LANGUAGE_CODE = 'ru-ru'
-TIME_ZONE = 'Europe/Moscow'
+TIME_ZONE = 'Asia/Almaty'
 USE_I18N = True
 USE_TZ = True
 
