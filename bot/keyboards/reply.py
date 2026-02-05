@@ -6,6 +6,6 @@ def main_menu_keyboard():
     keyboard = [
         [KeyboardButton('📋 Задания')],
         [KeyboardButton('📦 Мои выкупы')],
-        [KeyboardButton('👤 Профиль'), KeyboardButton('❓ Помощь')],
+        [KeyboardButton('👤 Профиль'), KeyboardButton('💬 Поддержка')],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

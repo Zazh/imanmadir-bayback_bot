@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'pipeline',
     'payouts',
     'bot',
+    'support',
 ]
 
 MIDDLEWARE = [

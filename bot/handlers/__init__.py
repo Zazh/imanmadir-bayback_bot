@@ -7,7 +7,7 @@ from telegram.ext import (
 )
 
 from .start import start_handler, onboarding_callback
-from .menu import profile_handler, help_handler
+from .menu import profile_handler
 from .tasks import tasks_list_handler, task_detail_callback, tasks_list_callback
 from .buybacks import my_buybacks_handler
 from .flow import (
@@ -19,6 +19,13 @@ from .flow import (
     resume_buyback,
     WAITING_RESPONSE,
 )
+from .support import (
+    support_handler,
+    support_message_handler,
+    support_close_callback,
+    support_cancel,
+    WAITING_MESSAGE,
+)
 
 
 def register_handlers(application):
@@ -28,9 +35,8 @@ def register_handlers(application):
     flow_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(take_task_callback, pattern=r'^take:\d+$'),
-            # Возобновление выкупа при отправке фото/текста
             MessageHandler(filters.PHOTO, resume_buyback),
-            MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex('^(📋|📦|👤|❓)'), resume_buyback),
+            MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex('^(📋|📦|👤|💬)'), resume_buyback),
         ],
         states={
             WAITING_RESPONSE: [
@@ -48,7 +54,27 @@ def register_handlers(application):
         per_chat=True,
     )
 
+    # ConversationHandler для поддержки
+    support_conv_handler = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Regex('^💬 Поддержка$'), support_handler),
+        ],
+        states={
+            WAITING_MESSAGE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex('^(📋|📦|👤|💬)'), support_message_handler),
+                CallbackQueryHandler(support_close_callback, pattern=r'^support_close$'),
+            ],
+        },
+        fallbacks=[
+            MessageHandler(filters.Regex('^(📋|📦|👤)'), support_cancel),
+            CommandHandler('start', start_handler),
+        ],
+        per_user=True,
+        per_chat=True,
+    )
+
     application.add_handler(flow_handler)
+    application.add_handler(support_conv_handler)
 
     # Команды
     application.add_handler(CommandHandler('start', start_handler))
@@ -60,7 +86,6 @@ def register_handlers(application):
     application.add_handler(MessageHandler(filters.Regex('^📋 Задания$'), tasks_list_handler))
     application.add_handler(MessageHandler(filters.Regex('^📦 Мои выкупы$'), my_buybacks_handler))
     application.add_handler(MessageHandler(filters.Regex('^👤 Профиль$'), profile_handler))
-    application.add_handler(MessageHandler(filters.Regex('^❓ Помощь$'), help_handler))
 
     # Задания
     application.add_handler(CallbackQueryHandler(task_detail_callback, pattern=r'^task:\d+$'))
