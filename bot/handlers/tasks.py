@@ -133,16 +133,31 @@ async def task_detail_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             available_flag = False
             warning = '⚠️ У тебя уже есть активный выкуп этого задания'
 
-    steps_count = await task.steps.acount()
+    # Собираем шаги
+    steps = []
+    async for step in task.steps.all().order_by('order'):
+        steps.append(step)
 
-    text = (
-        f'📦 <b>{task.title}</b>\n\n'
+    text = f'📦 <b>{task.title}</b>\n\n'
+
+    text += (
         f'🏷 Товар: {task.product.name}\n'
         f'💰 Цена товара: {task.product.price}₸\n\n'
         f'💵 <b>Выплата:</b> {task.payout}₸\n\n'
-        f'📝 Шагов: {steps_count}\n'
-        f'📊 Осталось: {available} шт.\n'
-        f'👤 Лимит: {task.product.get_limit_display()}'
+    )
+
+    # Выводим список шагов с временем
+    text += f'📝 <b>Шаги ({len(steps)}):</b>\n'
+    for step in steps:
+        step_title = step.title if step.title else step.get_step_type_display()
+        time_info = f' ({step.timeout_minutes} мин.)' if step.timeout_minutes else ''
+        text += f'  {step.order}. {step_title}{time_info}\n'
+
+    text += (
+        f'\n📊 Осталось: {available} шт.\n'
+        f'👤 Лимит: {task.product.get_limit_display()}\n\n'
+        f'⏱ <i>Нажав «Взять задание», мы забронируем товар. '
+        f'На каждый шаг отводится своё время — если не успеешь, бронь отменится.</i>'
     )
 
     if warning:

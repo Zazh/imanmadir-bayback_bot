@@ -6,7 +6,18 @@ class TaskStepInline(admin.TabularInline):
     model = TaskStep
     extra = 1
     ordering = ['order']
-    fields = ['order', 'step_type', 'instruction', 'image', 'settings', 'timeout_hours', 'requires_moderation']
+    fields = [
+        'order',
+        'title',
+        'step_type',
+        'instruction',
+        'image',
+        'timeout_minutes',
+        'reminder_minutes',
+        'reminder_text',
+        'requires_moderation',
+        'settings',
+    ]
 
 
 @admin.register(Task)

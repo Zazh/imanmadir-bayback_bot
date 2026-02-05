@@ -17,6 +17,8 @@ from .buyback_flow import (
     step_choice_callback,
     cancel_buyback_callback,
     cancel_command,
+    payment_keep_callback,
+    payment_change_callback,
     STEP_RESPONSE,
 )
 
@@ -35,6 +37,8 @@ def register_handlers(application):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_step_response),
                 CallbackQueryHandler(step_confirm_callback, pattern=r'^step_confirm:\d+$'),
                 CallbackQueryHandler(step_choice_callback, pattern=r'^step_choice:\d+:.+$'),
+                CallbackQueryHandler(payment_keep_callback, pattern=r'^payment_keep:\d+$'),
+                CallbackQueryHandler(payment_change_callback, pattern=r'^payment_change:\d+$'),
             ],
         },
         fallbacks=[
@@ -70,3 +74,10 @@ def register_handlers(application):
     # Callback handlers
     application.add_handler(CallbackQueryHandler(task_detail_callback, pattern=r'^task_detail:\d+$'))
     application.add_handler(CallbackQueryHandler(tasks_list_callback, pattern=r'^tasks_list$'))
+
+    # DEBUG: Ловим все необработанные сообщения
+    async def debug_all_messages(update, context):
+        print(f"DEBUG CATCH-ALL: получено сообщение: {update.message.text if update.message else 'no message'}")
+        print(f"DEBUG CATCH-ALL: user_data = {context.user_data}")
+
+    application.add_handler(MessageHandler(filters.ALL, debug_all_messages))

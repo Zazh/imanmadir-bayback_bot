@@ -61,6 +61,8 @@ class TaskStep(models.Model):
         CONFIRM = 'confirm', 'Подтверждение'
         ORDER_NUMBER = 'order_number', 'Номер заказа'
         CHOICE = 'choice', 'Выбор варианта'
+        CHECK_LINK = 'check_link', 'Ссылка на чек'
+        PAYMENT_DETAILS = 'payment_details', 'Реквизиты для выплаты'
 
     task = models.ForeignKey(
         Task,
@@ -71,6 +73,12 @@ class TaskStep(models.Model):
     order = models.PositiveIntegerField(
         'Порядок',
     )
+    title = models.CharField(
+        'Заголовок',
+        max_length=255,
+        blank=True,
+        help_text='Короткий заголовок шага (опционально)',
+    )
     step_type = models.CharField(
         'Тип шага',
         max_length=20,
@@ -78,7 +86,7 @@ class TaskStep(models.Model):
     )
     instruction = models.TextField(
         'Инструкция',
-        help_text='Текст, который увидит пользователь',
+        help_text='Подробный текст, который увидит пользователь',
     )
     image = models.ImageField(
         'Изображение',
@@ -92,16 +100,32 @@ class TaskStep(models.Model):
         blank=True,
         help_text='correct_article, choices, hint и т.д.',
     )
-    timeout_hours = models.PositiveIntegerField(
-        'Таймаут (часы)',
+
+    # Время выполнения
+    timeout_minutes = models.PositiveIntegerField(
+        'Время на выполнение (минут)',
         null=True,
         blank=True,
         help_text='Оставьте пустым если без ограничения',
     )
+
+    # Напоминание
+    reminder_minutes = models.PositiveIntegerField(
+        'Напоминание через (минут)',
+        null=True,
+        blank=True,
+        help_text='Через сколько минут отправить напоминание',
+    )
+    reminder_text = models.TextField(
+        'Текст напоминания',
+        blank=True,
+        help_text='Текст который получит пользователь. Доступные переменные: {remaining_time}, {task_title}, {step_title}',
+    )
+
     requires_moderation = models.BooleanField(
         'Требует модерации',
         default=False,
-        help_text='Если включено — ответ отправляется на проверку модератору',
+        help_text='Если включено — время не ограничено, бронь не отменяется',
     )
 
     class Meta:

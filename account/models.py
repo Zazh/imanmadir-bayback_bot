@@ -24,17 +24,25 @@ class TelegramUser(models.Model):
         max_length=255,
         blank=True,
     )
+
+    # Реквизиты для выплат
     phone = models.CharField(
-        'Телефон',
+        'Телефон привязанный к банку',
         max_length=20,
         blank=True,
-        help_text='Для связи по выплатам',
+        help_text='Номер телефона для перевода',
     )
-    card_number = models.CharField(
-        'Номер карты',
-        max_length=30,
+    bank_name = models.CharField(
+        'Название банка',
+        max_length=100,
         blank=True,
-        help_text='Для выплат',
+        help_text='Например: Kaspi, Halyk, Jusan',
+    )
+    card_holder_name = models.CharField(
+        'ФИО владельца карты',
+        max_length=255,
+        blank=True,
+        help_text='Имя как на банковской карте',
     )
 
     # Онбординг
@@ -95,5 +103,12 @@ class TelegramUser(models.Model):
 
     @property
     def has_payment_info(self):
-        """Указаны ли реквизиты для выплат"""
-        return bool(self.card_number)
+        """Указаны ли все реквизиты для выплат"""
+        return bool(self.phone and self.bank_name and self.card_holder_name)
+
+    @property
+    def payment_info_display(self):
+        """Отображение реквизитов"""
+        if not self.has_payment_info:
+            return 'Не заполнены'
+        return f'{self.bank_name}: {self.phone} ({self.card_holder_name})'
