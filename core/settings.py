@@ -23,11 +23,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third party
     'corsheaders',
+    # Local
     'account',
     'catalog',
-    'tasks',
+    'steps',
+    'pipeline',
+    'payouts',
     'bot',
-
 ]
 
 MIDDLEWARE = [

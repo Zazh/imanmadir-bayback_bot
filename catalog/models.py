@@ -31,18 +31,16 @@ class Product(models.Model):
         help_text='Краткое описание для выкупщиков',
     )
 
-    # Общее количество
     quantity_total = models.PositiveIntegerField(
         'Всего на выкуп',
         default=0,
-        help_text='Общее количество товаров доступных для выкупа',
+        help_text='Общее количество товаров для выкупа',
     )
     quantity_completed = models.PositiveIntegerField(
         'Выкуплено',
         default=0,
     )
 
-    # Персональные ограничения
     limit_per_user = models.PositiveIntegerField(
         'Лимит на пользователя',
         default=1,
@@ -51,14 +49,13 @@ class Product(models.Model):
     limit_per_user_days = models.PositiveIntegerField(
         'Период лимита (дней)',
         default=0,
-        help_text='За какой период считать (0 = за всё время, 1 = в сутки)',
+        help_text='За какой период считать (0 = за всё время)',
     )
 
     is_active = models.BooleanField(
         'Активен',
         default=True,
     )
-
     created_at = models.DateTimeField(
         'Дата создания',
         auto_now_add=True,
@@ -76,25 +73,6 @@ class Product(models.Model):
     def __str__(self):
         return f'{self.name} ({self.wb_article})'
 
-    @property
-    def quantity_available(self):
-        """Доступно для выкупа (синхронно, для админки)"""
-        from tasks.models import Buyback
-        in_progress = Buyback.objects.filter(
-            task__product=self,
-            status__in=[Buyback.Status.IN_PROGRESS, Buyback.Status.ON_REVIEW]
-        ).count()
-        return self.quantity_total - self.quantity_completed - in_progress
-
-    async def aget_quantity_available(self):
-        """Доступно для выкупа (асинхронно, для бота)"""
-        from tasks.models import Buyback
-        in_progress = await Buyback.objects.filter(
-            task__product=self,
-            status__in=[Buyback.Status.IN_PROGRESS, Buyback.Status.ON_REVIEW]
-        ).acount()
-        return self.quantity_total - self.quantity_completed - in_progress
-
     def get_limit_display(self):
         """Текстовое описание лимита"""
         if self.limit_per_user == 0:
@@ -104,3 +82,107 @@ class Product(models.Model):
         if self.limit_per_user_days == 1:
             return f'{self.limit_per_user} раз в сутки'
         return f'{self.limit_per_user} раз за {self.limit_per_user_days} дней'
+
+    def get_quantity_available(self):
+        """Доступно для выкупа (синхронно)"""
+        from pipeline.models import Buyback
+
+        in_progress = Buyback.objects.filter(
+            task__product=self,
+            status__in=[
+                Buyback.Status.IN_PROGRESS,
+                Buyback.Status.ON_MODERATION,
+                Buyback.Status.PENDING_REVIEW,
+            ]
+        ).count()
+
+        return self.quantity_total - self.quantity_completed - in_progress
+
+    async def aget_quantity_available(self):
+        """Доступно для выкупа (асинхронно)"""
+        from pipeline.models import Buyback
+
+        in_progress = await Buyback.objects.filter(
+            task__product=self,
+            status__in=[
+                Buyback.Status.IN_PROGRESS,
+                Buyback.Status.ON_MODERATION,
+                Buyback.Status.PENDING_REVIEW,
+            ]
+        ).acount()
+
+        return self.quantity_total - self.quantity_completed - in_progress
+
+    async def acheck_user_limit(self, user) -> tuple[bool, str]:
+        """Проверка лимита пользователя. Возвращает (can_take, message)"""
+        from pipeline.models import Buyback
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if self.limit_per_user == 0:
+            return True, ''
+
+        queryset = Buyback.objects.filter(
+            user=user,
+            task__product=self,
+            status__in=[
+                Buyback.Status.IN_PROGRESS,
+                Buyback.Status.ON_MODERATION,
+                Buyback.Status.PENDING_REVIEW,
+                Buyback.Status.APPROVED,
+            ]
+        )
+
+        if self.limit_per_user_days > 0:
+            since = timezone.now() - timedelta(days=self.limit_per_user_days)
+            queryset = queryset.filter(started_at__gte=since)
+
+        count = await queryset.acount()
+
+        if count >= self.limit_per_user:
+            return False, self.get_limit_display()
+
+        return True, ''
+
+
+class Task(models.Model):
+    """Задание на выкуп"""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='tasks',
+        verbose_name='Товар',
+    )
+    title = models.CharField(
+        'Название задания',
+        max_length=255,
+        help_text='Например: Выкуп футболки с отзывом',
+    )
+    payout = models.DecimalField(
+        'Выплата',
+        max_digits=10,
+        decimal_places=2,
+        help_text='Сумма которую получит выкупщик',
+    )
+
+    is_active = models.BooleanField(
+        'Активно',
+        default=True,
+    )
+    created_at = models.DateTimeField(
+        'Дата создания',
+        auto_now_add=True,
+    )
+    updated_at = models.DateTimeField(
+        'Дата обновления',
+        auto_now=True,
+    )
+
+    class Meta:
+        verbose_name = 'Задание'
+        verbose_name_plural = 'Задания'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title

@@ -1,55 +1,54 @@
 from telegram.ext import (
     CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
+    MessageHandler,
     ConversationHandler,
     filters,
 )
 
 from .start import start_handler, onboarding_callback
-from .menu import help_handler, profile_handler
+from .menu import profile_handler, help_handler
 from .tasks import tasks_list_handler, task_detail_callback, tasks_list_callback
 from .buybacks import my_buybacks_handler
-from .buyback_flow import (
+from .flow import (
     take_task_callback,
-    handle_step_response,
-    step_confirm_callback,
-    step_choice_callback,
-    cancel_buyback_callback,
-    cancel_command,
-    payment_keep_callback,
-    payment_change_callback,
-    STEP_RESPONSE,
+    handle_response,
+    confirm_callback,
+    choice_callback,
+    cancel_callback,
+    resume_buyback,
+    WAITING_RESPONSE,
 )
 
 
 def register_handlers(application):
-    """Регистрация всех обработчиков"""
+    """Регистрация обработчиков"""
 
     # ConversationHandler для прохождения выкупа
-    buyback_conv = ConversationHandler(
+    flow_handler = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(take_task_callback, pattern=r'^take_task:\d+$'),
+            CallbackQueryHandler(take_task_callback, pattern=r'^take:\d+$'),
+            # Возобновление выкупа при отправке фото/текста
+            MessageHandler(filters.PHOTO, resume_buyback),
+            MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex('^(📋|📦|👤|❓)'), resume_buyback),
         ],
         states={
-            STEP_RESPONSE: [
-                MessageHandler(filters.PHOTO, handle_step_response),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_step_response),
-                CallbackQueryHandler(step_confirm_callback, pattern=r'^step_confirm:\d+$'),
-                CallbackQueryHandler(step_choice_callback, pattern=r'^step_choice:\d+:.+$'),
-                CallbackQueryHandler(payment_keep_callback, pattern=r'^payment_keep:\d+$'),
-                CallbackQueryHandler(payment_change_callback, pattern=r'^payment_change:\d+$'),
+            WAITING_RESPONSE: [
+                MessageHandler(filters.PHOTO, handle_response),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_response),
+                CallbackQueryHandler(confirm_callback, pattern=r'^confirm:\d+$'),
+                CallbackQueryHandler(choice_callback, pattern=r'^choice:\d+:.+$'),
             ],
         },
         fallbacks=[
-            CommandHandler('cancel', cancel_command),
-            CallbackQueryHandler(cancel_buyback_callback, pattern=r'^cancel_buyback:\d+$'),
+            CallbackQueryHandler(cancel_callback, pattern=r'^cancel:\d+$'),
+            CommandHandler('start', start_handler),
         ],
         per_user=True,
         per_chat=True,
     )
 
-    application.add_handler(buyback_conv)
+    application.add_handler(flow_handler)
 
     # Команды
     application.add_handler(CommandHandler('start', start_handler))
@@ -57,27 +56,12 @@ def register_handlers(application):
     # Онбординг
     application.add_handler(CallbackQueryHandler(onboarding_callback, pattern=r'^onboard:.+$'))
 
-    # Кнопки меню (текстовые)
-    application.add_handler(MessageHandler(
-        filters.Regex('^📋 Доступные задания$'), tasks_list_handler
-    ))
-    application.add_handler(MessageHandler(
-        filters.Regex('^📦 Мои выкупы$'), my_buybacks_handler
-    ))
-    application.add_handler(MessageHandler(
-        filters.Regex('^👤 Профиль$'), profile_handler
-    ))
-    application.add_handler(MessageHandler(
-        filters.Regex('^❓ Помощь$'), help_handler
-    ))
+    # Меню
+    application.add_handler(MessageHandler(filters.Regex('^📋 Задания$'), tasks_list_handler))
+    application.add_handler(MessageHandler(filters.Regex('^📦 Мои выкупы$'), my_buybacks_handler))
+    application.add_handler(MessageHandler(filters.Regex('^👤 Профиль$'), profile_handler))
+    application.add_handler(MessageHandler(filters.Regex('^❓ Помощь$'), help_handler))
 
-    # Callback handlers
-    application.add_handler(CallbackQueryHandler(task_detail_callback, pattern=r'^task_detail:\d+$'))
+    # Задания
+    application.add_handler(CallbackQueryHandler(task_detail_callback, pattern=r'^task:\d+$'))
     application.add_handler(CallbackQueryHandler(tasks_list_callback, pattern=r'^tasks_list$'))
-
-    # DEBUG: Ловим все необработанные сообщения
-    async def debug_all_messages(update, context):
-        print(f"DEBUG CATCH-ALL: получено сообщение: {update.message.text if update.message else 'no message'}")
-        print(f"DEBUG CATCH-ALL: user_data = {context.user_data}")
-
-    application.add_handler(MessageHandler(filters.ALL, debug_all_messages))
