@@ -1,0 +1,90 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}{{ task.title }} — BayBack{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'backoffice:task_list' %}">Задания</a></li>
+    <li class="breadcrumb-item active">{{ task.title }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">{{ task.title }}</h4>
+  <a href="{% url 'backoffice:task_edit' task.pk %}" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> Редактировать</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Товар</div>
+        <div>{{ task.product.name }}</div>
+        <code>{{ task.product.wb_article }}</code>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Выплата</div>
+        <div class="fs-5 fw-bold">{{ task.payout }} &#8376;</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Статус</div>
+        {% if task.is_active %}
+        <span class="badge bg-success">Активно</span>
+        {% else %}
+        <span class="badge bg-secondary">Неактивно</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <h6 class="mb-0">Шаги задания ({{ steps|length }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 60px">#</th>
+          <th>Заголовок</th>
+          <th>Тип</th>
+          <th>Модерация</th>
+          <th>Таймаут</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for step in steps %}
+        <tr>
+          <td><span class="badge bg-light text-dark">{{ step.order }}</span></td>
+          <td>
+            <strong>{{ step.title|default:"—" }}</strong>
+            <div class="text-muted small text-truncate" style="max-width: 400px">{{ step.instruction }}</div>
+          </td>
+          <td><span class="badge bg-light text-dark">{{ step.get_step_type_display }}</span></td>
+          <td>
+            {% if step.requires_moderation %}
+            <i class="bi bi-check-circle text-warning"></i> Да
+            {% else %}
+            <span class="text-muted">Нет</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if step.timeout_minutes %}{{ step.timeout_minutes }} мин{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

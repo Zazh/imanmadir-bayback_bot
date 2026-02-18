@@ -1,10 +1,12 @@
-import requests
 from django.conf import settings
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+import requests
 
 from .models import Buyback, BuybackResponse
-from .services import format_step_message, send_telegram_message
+from .services import format_step_message
+from .reminder_service import create_reminders_for_step
+from steps.models import StepType
 
 
 @receiver(post_save, sender=BuybackResponse)
@@ -30,12 +32,31 @@ def on_response_approved(sender, instance, **kwargs):
         buyback.save(update_fields=['current_step', 'status'])
 
         total_steps = buyback.task.steps.count()
-        text = format_step_message(
-            buyback.task,
-            next_step,
-            total_steps,
-            prefix='✅ <b>Модератор одобрил!</b>\n\n'
-        )
+
+        # Для шага публикации отзыва — особая обработка
+        if next_step.step_type == StepType.PUBLISH_REVIEW and next_step.publish_time:
+            # Создаём напоминания
+            create_reminders_for_step(buyback, next_step)
+
+            publish_time_str = next_step.publish_time.strftime('%H:%M')
+            text = (
+                '✅ <b>Модератор одобрил!</b>\n\n'
+                f'📦 <b>{buyback.task.title}</b>\n'
+                f'Шаг {next_step.order} из {total_steps}\n\n'
+            )
+            if next_step.title:
+                text += f'<b>{next_step.title}</b>\n\n'
+            text += next_step.instruction
+            text += f'\n\n⏰ <b>Время публикации: {publish_time_str} МСК</b>'
+            text += '\n\nЯ напомню тебе когда придёт время.'
+            text += '\n\n📸 После публикации отправь скриншот отзыва.'
+        else:
+            text = format_step_message(
+                buyback.task,
+                next_step,
+                total_steps,
+                prefix='✅ <b>Модератор одобрил!</b>\n\n'
+            )
     else:
         buyback.status = Buyback.Status.PENDING_REVIEW
         buyback.save(update_fields=['status'])
@@ -53,30 +74,25 @@ def on_buyback_status_change(sender, instance, **kwargs):
     """При изменении статуса выкупа"""
 
     if not instance.pk:
-        return  # Новый объект
+        return
 
     try:
         old_instance = Buyback.objects.get(pk=instance.pk)
     except Buyback.DoesNotExist:
         return
 
-    # Если статус изменился на APPROVED
     if old_instance.status != Buyback.Status.APPROVED and instance.status == Buyback.Status.APPROVED:
-        # Создаём выплату
         from payouts.models import Payout
 
-        # Проверяем что выплата ещё не создана
         if not Payout.objects.filter(buyback=instance).exists():
             Payout.create_from_buyback(instance)
 
-            # Обновляем счётчики
             instance.task.product.quantity_completed += 1
             instance.task.product.save(update_fields=['quantity_completed'])
 
             instance.user.total_completed += 1
             instance.user.save(update_fields=['total_completed'])
 
-            # Уведомляем пользователя
             text = (
                 '🎉 <b>Выкуп одобрен!</b>\n\n'
                 f'Задание: {instance.task.title}\n'
@@ -84,6 +100,7 @@ def on_buyback_status_change(sender, instance, **kwargs):
                 'Выплата поступит в ближайшее время.'
             )
             send_telegram_message(instance.user.telegram_id, text)
+
 
 def send_telegram_message(chat_id: int, text: str):
     """Отправка сообщения в Telegram"""

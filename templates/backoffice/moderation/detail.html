@@ -1,0 +1,118 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}Модерация ответа — BayBack{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'backoffice:moderation_list' %}">Модерация</a></li>
+    <li class="breadcrumb-item active">Ответ #{{ response.pk }}</li>
+  </ol>
+</nav>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Выкуп</h6>
+        <a href="{% url 'backoffice:buyback_detail' response.buyback.pk %}">
+          {{ response.buyback.task.title }} (#{{ response.buyback.pk }})
+        </a>
+        <div class="small text-muted mt-1">
+          Пользователь: <a href="{% url 'backoffice:user_detail' response.buyback.user.pk %}">{{ response.buyback.user }}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Шаг {{ response.step.order }}: {{ response.step.title|default:response.step.get_step_type_display }}</h6>
+        <div class="small">{{ response.step.instruction }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white">
+    <h6 class="mb-0">Ответ пользователя</h6>
+  </div>
+  <div class="card-body">
+    {% if response.response_data.photo %}
+    <div class="mb-3">
+      <img src="/media/{{ response.response_data.photo }}" alt="Фото" class="img-fluid rounded" style="max-width: 500px">
+    </div>
+    {% endif %}
+
+    {% if response.response_data.text %}
+    <div class="mb-3">
+      <strong>Текст:</strong>
+      <div class="p-2 bg-light rounded mt-1">{{ response.response_data.text }}</div>
+    </div>
+    {% endif %}
+
+    {% if response.response_data.value %}
+    <div class="mb-3"><strong>Значение:</strong> {{ response.response_data.value }}</div>
+    {% endif %}
+
+    {% if response.response_data.phone %}
+    <div class="mb-3"><strong>Телефон:</strong> {{ response.response_data.phone }}</div>
+    {% endif %}
+
+    {% if response.response_data.bank %}
+    <div class="mb-3"><strong>Банк:</strong> {{ response.response_data.bank }}</div>
+    {% endif %}
+
+    {% if response.response_data.name %}
+    <div class="mb-3"><strong>ФИО:</strong> {{ response.response_data.name }}</div>
+    {% endif %}
+
+    <div class="small text-muted">Отправлено: {{ response.created_at|date:"d.m.Y H:i" }}</div>
+  </div>
+</div>
+
+{% if response.status == 'pending' %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <h6 class="mb-0">Решение</h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="approve">
+          <div class="mb-3">
+            <label class="form-label">Комментарий (необязательно)</label>
+            <textarea name="moderator_comment" class="form-control" rows="2"></textarea>
+          </div>
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-lg"></i> Одобрить
+          </button>
+        </form>
+      </div>
+      <div class="col-md-6">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reject">
+          <div class="mb-3">
+            <label class="form-label">Причина отклонения</label>
+            <textarea name="moderator_comment" class="form-control" rows="2" placeholder="Укажите причину..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-danger w-100">
+            <i class="bi bi-x-lg"></i> Отклонить
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-{{ response.status|status_badge }}">
+  Статус: <strong>{{ response.get_status_display }}</strong>
+  {% if response.moderator_comment %}<br>Комментарий: {{ response.moderator_comment }}{% endif %}
+</div>
+{% endif %}
+{% endblock %}

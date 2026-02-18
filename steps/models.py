@@ -11,6 +11,7 @@ class StepType(models.TextChoices):
     CHOICE = 'choice', 'Выбор варианта'
     CHECK_LINK = 'check_link', 'Ссылка на чек'
     PAYMENT_DETAILS = 'payment_details', 'Реквизиты для выплаты'
+    PUBLISH_REVIEW = 'publish_review', 'Публикация отзыва'
 
 
 class TaskStep(models.Model):
@@ -51,6 +52,14 @@ class TaskStep(models.Model):
         default=dict,
         blank=True,
         help_text='correct_article, choices, hint и т.д.',
+    )
+
+    # Для шага публикации отзыва
+    publish_time = models.TimeField(
+        'Время публикации (МСК)',
+        null=True,
+        blank=True,
+        help_text='Только для типа "Публикация отзыва"',
     )
 
     # Тайминги

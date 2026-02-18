@@ -1,0 +1,72 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}Задания — BayBack{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">Задания</h4>
+  <a href="{% url 'backoffice:task_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Создать задание</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-auto">
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Поиск...">
+      </div>
+      <div class="col-auto">
+        <select name="is_active" class="form-select form-select-sm">
+          <option value="">Все</option>
+          <option value="1" {% if is_active == '1' %}selected{% endif %}>Активные</option>
+          <option value="0" {% if is_active == '0' %}selected{% endif %}>Неактивные</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary">Фильтр</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Название</th>
+          <th>Товар</th>
+          <th>Выплата</th>
+          <th>Статус</th>
+          <th>Создано</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in page %}
+        <tr>
+          <td><a href="{% url 'backoffice:task_detail' task.pk %}">{{ task.title }}</a></td>
+          <td>{{ task.product.name }}</td>
+          <td>{{ task.payout }} &#8376;</td>
+          <td>
+            {% if task.is_active %}
+            <span class="badge bg-success">Активно</span>
+            {% else %}
+            <span class="badge bg-secondary">Неактивно</span>
+            {% endif %}
+          </td>
+          <td>{{ task.created_at|date:"d.m.Y" }}</td>
+          <td>
+            <a href="{% url 'backoffice:task_edit' task.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted text-center py-3">Нет заданий</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "backoffice/_pagination.html" %}
+{% endblock %}

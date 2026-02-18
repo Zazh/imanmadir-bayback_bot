@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     'pipeline',
     'payouts',
     'bot',
-    'support',
+    'backoffice',
 ]
 
 MIDDLEWARE = [
@@ -57,6 +57,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'backoffice.context_processors.moderation_count',
             ],
         },
     },

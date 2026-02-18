@@ -1,0 +1,40 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}{% if product %}Редактировать товар{% else %}Новый товар{% endif %} — BayBack{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'backoffice:product_list' %}">Товары</a></li>
+    <li class="breadcrumb-item active">{% if product %}Редактировать{% else %}Создать{% endif %}</li>
+  </ol>
+</nav>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title mb-3">{% if product %}Редактировать товар{% else %}Новый товар{% endif %}</h5>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="mb-3 {% if field.name == 'is_active' %}form-check{% endif %}">
+        {% if field.name == 'is_active' %}
+          {{ field }}
+          <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {% else %}
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% endif %}
+        {% if field.errors %}
+        <div class="invalid-feedback d-block">{{ field.errors.0 }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{% url 'backoffice:product_list' %}" class="btn btn-outline-secondary">Отмена</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

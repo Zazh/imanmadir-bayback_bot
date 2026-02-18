@@ -43,3 +43,13 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f'<b>Вопросы?</b> Напиши @{settings.MANAGER_USERNAME}'
     )
     await update.message.reply_text(text, parse_mode='HTML')
+
+
+async def support_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Поддержка — ссылка на менеджера"""
+    text = (
+        '💬 <b>Поддержка</b>\n\n'
+        f'По всем вопросам пиши менеджеру:\n'
+        f'👉 @{settings.MANAGER_USERNAME}'
+    )
+    await update.message.reply_text(text, parse_mode='HTML')

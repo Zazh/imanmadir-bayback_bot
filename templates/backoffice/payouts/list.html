@@ -1,0 +1,88 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}Выплаты — BayBack{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Выплаты</h4>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-auto">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">Все статусы</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary">Фильтр</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Пользователь</th>
+          <th>Сумма</th>
+          <th>Реквизиты</th>
+          <th>Статус</th>
+          <th>Дата</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for payout in page %}
+        <tr>
+          <td>{{ payout.pk }}</td>
+          <td><a href="{% url 'backoffice:user_detail' payout.user.pk %}">{{ payout.user }}</a></td>
+          <td class="fw-bold">{{ payout.amount }} &#8376;</td>
+          <td>
+            <div>{{ payout.payment_bank }}</div>
+            <div class="small text-muted">{{ payout.payment_phone }}</div>
+            <div class="small text-muted">{{ payout.payment_name }}</div>
+          </td>
+          <td><span class="badge bg-{{ payout.status|status_badge }}">{{ payout.get_status_display }}</span></td>
+          <td>{{ payout.created_at|date:"d.m.Y H:i" }}</td>
+          <td>
+            {% if payout.status == 'pending' or payout.status == 'processing' %}
+            <div class="d-flex gap-1">
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="payout_id" value="{{ payout.pk }}">
+                <input type="hidden" name="action" value="complete">
+                <button type="submit" class="btn btn-sm btn-success" title="Выплачено" onclick="return confirm('Отметить как выплачено?')">
+                  <i class="bi bi-check-lg"></i>
+                </button>
+              </form>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="payout_id" value="{{ payout.pk }}">
+                <input type="hidden" name="action" value="fail">
+                <button type="submit" class="btn btn-sm btn-danger" title="Ошибка" onclick="return confirm('Отметить как ошибку?')">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </form>
+            </div>
+            {% elif payout.processed_at %}
+            <small class="text-muted">{{ payout.processed_at|date:"d.m.Y H:i" }}</small>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-muted text-center py-3">Нет выплат</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "backoffice/_pagination.html" %}
+{% endblock %}

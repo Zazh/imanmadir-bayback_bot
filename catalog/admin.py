@@ -13,6 +13,7 @@ class TaskStepInline(admin.TabularInline):
         'step_type',
         'instruction',
         'image',
+        'publish_time',
         'timeout_minutes',
         'requires_moderation',
     ]

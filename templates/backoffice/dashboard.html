@@ -1,0 +1,124 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}Дашборд — BayBack{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Дашборд</h4>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="text-muted small">Активные выкупы</div>
+            <div class="fs-3 fw-bold">{{ active_buybacks }}</div>
+          </div>
+          <i class="bi bi-arrow-repeat fs-1 text-primary opacity-25"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="text-muted small">На модерации</div>
+            <div class="fs-3 fw-bold text-warning">{{ on_moderation }}</div>
+          </div>
+          <i class="bi bi-shield-check fs-1 text-warning opacity-25"></i>
+        </div>
+        {% if on_moderation %}
+        <a href="{% url 'backoffice:moderation_list' %}" class="btn btn-warning btn-sm mt-2">Проверить</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="text-muted small">Ожидают одобрения</div>
+            <div class="fs-3 fw-bold text-info">{{ pending_review }}</div>
+          </div>
+          <i class="bi bi-hourglass-split fs-1 text-info opacity-25"></i>
+        </div>
+        {% if pending_review %}
+        <a href="{% url 'backoffice:buyback_list' %}?status=pending_review" class="btn btn-info btn-sm mt-2">Проверить</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="text-muted small">Ожидают выплаты</div>
+            <div class="fs-3 fw-bold text-success">{{ pending_payouts }}</div>
+          </div>
+          <i class="bi bi-cash-stack fs-1 text-success opacity-25"></i>
+        </div>
+        {% if pending_payouts %}
+        <a href="{% url 'backoffice:payout_list' %}?status=pending" class="btn btn-success btn-sm mt-2">Выплатить</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Активных товаров</div>
+        <div class="fs-4 fw-bold">{{ total_products }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Пользователей</div>
+        <div class="fs-4 fw-bold">{{ total_users }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <h6 class="mb-0">Последние выкупы</h6>
+    <a href="{% url 'backoffice:buyback_list' %}" class="btn btn-sm btn-outline-secondary">Все выкупы</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Задание</th>
+          <th>Пользователь</th>
+          <th>Статус</th>
+          <th>Дата</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in recent_buybacks %}
+        <tr>
+          <td><a href="{% url 'backoffice:buyback_detail' b.pk %}">{{ b.pk }}</a></td>
+          <td>{{ b.task.title }}</td>
+          <td><a href="{% url 'backoffice:user_detail' b.user.pk %}">{{ b.user }}</a></td>
+          <td><span class="badge bg-{{ b.status|status_badge }}">{{ b.get_status_display }}</span></td>
+          <td>{{ b.started_at|date:"d.m.Y H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted text-center py-3">Нет выкупов</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

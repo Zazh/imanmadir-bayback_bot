@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 import os
 
+from bot.reminders import schedule_publish_review_reminders, cancel_buyback_reminders
 from account.models import TelegramUser
 from catalog.models import Task
 from steps.models import TaskStep, StepType
@@ -72,7 +73,7 @@ async def take_task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     can_take, limit_msg = await task.product.acheck_user_limit(user)
     if not can_take:
-        await query.edit_message_text(f'⚠️ Лимит исчерпан: {limit_msg}')
+        await query.edit_message_text(f'⚠️ Лимит на это задание исчерпан: {limit_msg}')
         return ConversationHandler.END
 
     has_active = await Buyback.objects.filter(
@@ -107,6 +108,17 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, buyback:
     """Показать шаг пользователю"""
     task = await Task.objects.aget(id=buyback.task_id)
     total_steps = await task.steps.acount()
+
+    # Для шага публикации отзыва — запускаем систему напоминаний
+    if step.step_type == StepType.PUBLISH_REVIEW and step.publish_time:
+        # Загружаем user для напоминаний
+        buyback_with_user = await Buyback.objects.select_related('user').aget(id=buyback.id)
+        await schedule_publish_review_reminders(context.application, buyback_with_user, step)
+
+        context.user_data['step_id'] = step.id
+        context.user_data['step_type'] = step.step_type
+
+        return WAITING_RESPONSE
 
     text = format_step_message(task, step, total_steps)
 
@@ -193,9 +205,12 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text('⚠️ Ошибка. Начни заново.')
         return ConversationHandler.END
 
-    if step_type == StepType.PHOTO:
+    if step_type in (StepType.PHOTO, StepType.PUBLISH_REVIEW):
         if not update.message.photo:
-            await update.message.reply_text('📸 Отправь фото')
+            if step_type == StepType.PUBLISH_REVIEW:
+                await update.message.reply_text('📸 Отправь скриншот опубликованного отзыва')
+            else:
+                await update.message.reply_text('📸 Отправь фото')
             return WAITING_RESPONSE
 
         photo = update.message.photo[-1]
@@ -231,6 +246,11 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if status == BuybackResponse.Status.PENDING:
         buyback.status = Buyback.Status.ON_MODERATION
         await buyback.asave(update_fields=['status'])
+
+        # Отменяем напоминания если это был шаг публикации отзыва
+        if step.step_type == StepType.PUBLISH_REVIEW:
+            buyback_with_user = await Buyback.objects.select_related('user').aget(id=buyback.id)
+            await cancel_buyback_reminders(context.application, buyback_with_user)
 
         await update.message.reply_text(
             '✅ Отправлено на проверку! Ожидай.',

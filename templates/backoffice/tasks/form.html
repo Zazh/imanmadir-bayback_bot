@@ -1,0 +1,142 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}{% if task %}Редактировать задание{% else %}Новое задание{% endif %} — BayBack{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'backoffice:task_list' %}">Задания</a></li>
+    <li class="breadcrumb-item active">{% if task %}Редактировать{% else %}Создать{% endif %}</li>
+  </ol>
+</nav>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h5 class="card-title mb-3">{% if task %}Редактировать задание{% else %}Новое задание{% endif %}</h5>
+      {% for field in form %}
+      <div class="mb-3 {% if field.name == 'is_active' %}form-check{% endif %}">
+        {% if field.name == 'is_active' %}
+          {{ field }}
+          <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {% else %}
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% endif %}
+        {% if field.errors %}
+        <div class="invalid-feedback d-block">{{ field.errors.0 }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h6 class="mb-0">Шаги задания</h6>
+    </div>
+    <div class="card-body">
+      {{ formset.management_form }}
+      {% if formset.non_form_errors %}
+      <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+      {% endif %}
+
+      <div id="steps-container">
+        {% for step_form in formset %}
+        <div class="step-form border rounded p-3 mb-3 {% if step_form.errors %}border-danger{% endif %}">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Шаг {{ forloop.counter }}</strong>
+            {% if step_form.instance.pk %}
+            <div class="form-check">
+              {{ step_form.DELETE }}
+              <label class="form-check-label text-danger small" for="{{ step_form.DELETE.id_for_label }}">Удалить</label>
+            </div>
+            {% endif %}
+          </div>
+          {% for hidden in step_form.hidden_fields %}{{ hidden }}{% endfor %}
+          <div class="row g-2">
+            {% for field in step_form.visible_fields %}
+              {% if field.name != 'DELETE' %}
+              <div class="{% if field.name == 'instruction' or field.name == 'reminder_text' %}col-12{% elif field.name == 'requires_moderation' %}col-12{% else %}col-md-6{% endif %}">
+                {% if field.name == 'requires_moderation' %}
+                <div class="form-check mt-2">
+                  {{ field }}
+                  <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                </div>
+                {% else %}
+                <label class="form-label small text-muted" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% endif %}
+                {% if field.errors %}<div class="invalid-feedback d-block">{{ field.errors.0 }}</div>{% endif %}
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="add-step">
+        <i class="bi bi-plus-lg"></i> Добавить шаг
+      </button>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+    <a href="{% url 'backoffice:task_list' %}" class="btn btn-outline-secondary">Отмена</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('add-step').addEventListener('click', function() {
+    const container = document.getElementById('steps-container');
+    const totalForms = document.getElementById('id_steps-TOTAL_FORMS');
+    const formCount = parseInt(totalForms.value);
+
+    const lastForm = container.querySelector('.step-form:last-child');
+    if (!lastForm) return;
+
+    const newForm = lastForm.cloneNode(true);
+    newForm.classList.remove('border-danger');
+    newForm.querySelector('strong').textContent = 'Шаг ' + (formCount + 1);
+
+    newForm.querySelectorAll('input, select, textarea').forEach(function(input) {
+        const name = input.name.replace(/-\d+-/, '-' + formCount + '-');
+        const id = input.id.replace(/-\d+-/, '-' + formCount + '-');
+        input.name = name;
+        input.id = id;
+        if (input.type === 'checkbox') {
+            input.checked = false;
+        } else if (input.type !== 'hidden') {
+            input.value = '';
+        }
+    });
+
+    newForm.querySelectorAll('label').forEach(function(label) {
+        const forAttr = label.getAttribute('for');
+        if (forAttr) {
+            label.setAttribute('for', forAttr.replace(/-\d+-/, '-' + formCount + '-'));
+        }
+    });
+
+    // Remove delete checkbox for new forms
+    const deleteCheck = newForm.querySelector('.form-check');
+    if (deleteCheck) deleteCheck.remove();
+
+    // Clear hidden id field (new form)
+    const idField = newForm.querySelector('[name$="-id"]');
+    if (idField) idField.value = '';
+
+    newForm.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+
+    container.appendChild(newForm);
+    totalForms.value = formCount + 1;
+});
+</script>
+{% endblock %}

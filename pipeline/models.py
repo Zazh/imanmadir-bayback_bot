@@ -141,3 +141,63 @@ class BuybackResponse(models.Model):
 
     def __str__(self):
         return f'{self.buyback} — Шаг {self.step.order}'
+
+
+class ReviewReminder(models.Model):
+    """Напоминание о публикации отзыва"""
+
+    class ReminderType(models.TextChoices):
+        BEFORE_3H = 'before_3h', 'За 3 часа'
+        BEFORE_2H = 'before_2h', 'За 2 часа'
+        BEFORE_1H = 'before_1h', 'За 1 час'
+        BEFORE_5M = 'before_5m', 'За 5 минут'
+        OVERDUE = 'overdue', 'Просрочено'
+
+    buyback = models.ForeignKey(
+        Buyback,
+        on_delete=models.CASCADE,
+        related_name='reminders',
+        verbose_name='Выкуп',
+    )
+    step = models.ForeignKey(
+        'steps.TaskStep',
+        on_delete=models.CASCADE,
+        related_name='reminders',
+        verbose_name='Шаг',
+    )
+
+    reminder_type = models.CharField(
+        'Тип напоминания',
+        max_length=20,
+        choices=ReminderType.choices,
+    )
+    scheduled_at = models.DateTimeField(
+        'Запланировано на',
+    )
+    sent_at = models.DateTimeField(
+        'Отправлено',
+        null=True,
+        blank=True,
+    )
+    is_cancelled = models.BooleanField(
+        'Отменено',
+        default=False,
+    )
+    overdue_count = models.PositiveIntegerField(
+        'Счётчик просрочки',
+        default=0,
+        help_text='Сколько раз отправлено напоминание о просрочке',
+    )
+
+    created_at = models.DateTimeField(
+        'Создано',
+        auto_now_add=True,
+    )
+
+    class Meta:
+        verbose_name = 'Напоминание'
+        verbose_name_plural = 'Напоминания'
+        ordering = ['scheduled_at']
+
+    def __str__(self):
+        return f'{self.buyback} — {self.get_reminder_type_display()}'

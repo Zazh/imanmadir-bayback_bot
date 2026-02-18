@@ -1,0 +1,64 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}Выкупы — BayBack{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Выкупы</h4>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-auto">
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Поиск...">
+      </div>
+      <div class="col-auto">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">Все статусы</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary">Фильтр</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Задание</th>
+          <th>Пользователь</th>
+          <th>Шаг</th>
+          <th>Статус</th>
+          <th>Дата начала</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in page %}
+        <tr>
+          <td>{{ b.pk }}</td>
+          <td>{{ b.task.title }}</td>
+          <td><a href="{% url 'backoffice:user_detail' b.user.pk %}">{{ b.user }}</a></td>
+          <td>{{ b.current_step }}</td>
+          <td><span class="badge bg-{{ b.status|status_badge }}">{{ b.get_status_display }}</span></td>
+          <td>{{ b.started_at|date:"d.m.Y H:i" }}</td>
+          <td><a href="{% url 'backoffice:buyback_detail' b.pk %}" class="btn btn-sm btn-outline-primary">Открыть</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-muted text-center py-3">Нет выкупов</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "backoffice/_pagination.html" %}
+{% endblock %}

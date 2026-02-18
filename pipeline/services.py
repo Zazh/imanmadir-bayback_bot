@@ -25,8 +25,13 @@ def format_step_message(task, step, total_steps: int, prefix: str = '') -> str:
         StepType.CONFIRM: '',
         StepType.CHOICE: '',
         StepType.PAYMENT_DETAILS: '\n\n💳 Введи номер телефона:',
+        StepType.PUBLISH_REVIEW: '',
     }
     text += hints.get(step.step_type, '')
+
+    # Для шага публикации отзыва добавляем время
+    if step.step_type == StepType.PUBLISH_REVIEW and step.publish_time:
+        text += f'\n\n⏰ <b>Время публикации: {step.publish_time.strftime("%H:%M")} МСК</b>'
 
     return text
 

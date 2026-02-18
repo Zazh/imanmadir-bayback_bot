@@ -1,0 +1,96 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}{{ tg_user }} — BayBack{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'backoffice:user_list' %}">Пользователи</a></li>
+    <li class="breadcrumb-item active">{{ tg_user }}</li>
+  </ol>
+</nav>
+
+<h4 class="mb-4">{{ tg_user }}</h4>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Telegram</h6>
+        <div><strong>ID:</strong> <code>{{ tg_user.telegram_id }}</code></div>
+        {% if tg_user.username %}<div><strong>Username:</strong> @{{ tg_user.username }}</div>{% endif %}
+        <div><strong>Имя:</strong> {{ tg_user.first_name }} {{ tg_user.last_name }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Реквизиты</h6>
+        {% if tg_user.has_payment_info %}
+        <div><strong>Банк:</strong> {{ tg_user.bank_name }}</div>
+        <div><strong>Телефон:</strong> {{ tg_user.phone }}</div>
+        <div><strong>ФИО:</strong> {{ tg_user.card_holder_name }}</div>
+        {% else %}
+        <div class="text-muted">Не заполнены</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Статистика</h6>
+        <div><strong>Выкупов:</strong> {{ tg_user.total_completed }}</div>
+        <div><strong>Онбординг:</strong> {% if tg_user.is_onboarded %}<span class="text-success">Пройден</span>{% else %}<span class="text-muted">Нет</span>{% endif %}</div>
+        <div>
+          <strong>Статус:</strong>
+          {% if tg_user.is_blocked %}
+          <span class="badge bg-danger">Заблокирован</span>
+          {% elif tg_user.is_active %}
+          <span class="badge bg-success">Активен</span>
+          {% else %}
+          <span class="badge bg-secondary">Неактивен</span>
+          {% endif %}
+        </div>
+        <div class="small text-muted mt-2">Регистрация: {{ tg_user.created_at|date:"d.m.Y H:i" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <h6 class="mb-0">История выкупов</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Задание</th>
+          <th>Товар</th>
+          <th>Статус</th>
+          <th>Дата</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in buybacks %}
+        <tr>
+          <td>{{ b.pk }}</td>
+          <td>{{ b.task.title }}</td>
+          <td>{{ b.task.product.name }}</td>
+          <td><span class="badge bg-{{ b.status|status_badge }}">{{ b.get_status_display }}</span></td>
+          <td>{{ b.started_at|date:"d.m.Y H:i" }}</td>
+          <td><a href="{% url 'backoffice:buyback_detail' b.pk %}" class="btn btn-sm btn-outline-primary">Открыть</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted text-center py-3">Нет выкупов</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

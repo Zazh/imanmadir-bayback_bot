@@ -1,0 +1,64 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}Модерация — BayBack{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">
+  Модерация
+  {% if page.paginator.count %}
+  <span class="badge bg-warning fs-6">{{ page.paginator.count }}</span>
+  {% endif %}
+</h4>
+
+{% if page %}
+<div class="row g-3">
+  {% for resp in page %}
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <strong>{{ resp.buyback.task.title }}</strong>
+            <div class="small text-muted">{{ resp.buyback.user }} &middot; Шаг {{ resp.step.order }}: {{ resp.step.title|default:resp.step.get_step_type_display }}</div>
+          </div>
+          <span class="badge bg-warning">На проверке</span>
+        </div>
+
+        {% if resp.response_data.photo %}
+        <div class="mb-2">
+          <img src="/media/{{ resp.response_data.photo }}" alt="Фото" class="img-thumbnail" style="max-width: 200px; max-height: 200px">
+        </div>
+        {% endif %}
+
+        {% if resp.response_data.text %}
+        <div class="mb-2 text-truncate"><strong>Текст:</strong> {{ resp.response_data.text }}</div>
+        {% endif %}
+
+        {% if resp.response_data.value %}
+        <div class="mb-2"><strong>Значение:</strong> {{ resp.response_data.value }}</div>
+        {% endif %}
+
+        <div class="d-flex gap-2 mt-3">
+          <a href="{% url 'backoffice:moderation_detail' resp.pk %}" class="btn btn-sm btn-outline-primary">Проверить</a>
+          <a href="{% url 'backoffice:buyback_detail' resp.buyback.pk %}" class="btn btn-sm btn-outline-secondary">Выкуп #{{ resp.buyback.pk }}</a>
+        </div>
+      </div>
+      <div class="card-footer bg-white">
+        <small class="text-muted">{{ resp.created_at|date:"d.m.Y H:i" }}</small>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-check-circle fs-1 d-block mb-2"></i>
+    Нет ответов на проверке
+  </div>
+</div>
+{% endif %}
+
+{% include "backoffice/_pagination.html" %}
+{% endblock %}

@@ -8,6 +8,7 @@ from .order_number import OrderNumberValidator
 from .choice import ChoiceValidator
 from .check_link import CheckLinkValidator
 from .payment import PaymentDetailsValidator
+from .publish_review import PublishReviewValidator
 
 
 VALIDATORS = {
@@ -19,6 +20,7 @@ VALIDATORS = {
     StepType.CHOICE: ChoiceValidator,
     StepType.CHECK_LINK: CheckLinkValidator,
     StepType.PAYMENT_DETAILS: PaymentDetailsValidator,
+    StepType.PUBLISH_REVIEW: PublishReviewValidator,
 }
 
 
