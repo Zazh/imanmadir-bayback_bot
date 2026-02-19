@@ -65,7 +65,7 @@
           <div class="row g-2">
             {% for field in step_form.visible_fields %}
               {% if field.name != 'DELETE' %}
-              <div class="{% if field.name == 'instruction' or field.name == 'reminder_text' %}col-12{% elif field.name == 'requires_moderation' %}col-12{% else %}col-md-6{% endif %} {% if field.name == 'publish_time' %}publish-time-field{% endif %} {% if field.name == 'settings' %}settings-field{% endif %}">
+              <div class="{% if field.name == 'instruction' or field.name == 'reminder_text' or field.name == 'choices_text' %}col-12{% elif field.name == 'requires_moderation' %}col-12{% else %}col-md-6{% endif %} {% if field.name == 'publish_time' %}publish-time-field{% endif %} {% if field.name == 'correct_article' %}article-check-field{% endif %} {% if field.name == 'min_length' %}text-moderated-field{% endif %} {% if field.name == 'choices_text' %}choice-field{% endif %}">
                 {% if field.name == 'requires_moderation' %}
                 <div class="form-check mt-2">
                   {{ field }}
@@ -119,7 +119,9 @@ Sortable.create(document.getElementById('steps-container'), {
 // --- Show/hide fields based on step type ---
 var TYPE_FIELDS = {
     'publish-time': ['publish_review'],
-    'settings': ['article_check', 'text_moderated', 'choice'],
+    'article-check': ['article_check'],
+    'text-moderated': ['text_moderated'],
+    'choice': ['choice'],
 };
 
 function toggleConditionalFields(stepForm) {

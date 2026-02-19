@@ -39,11 +39,28 @@ class TaskForm(forms.ModelForm):
 
 
 class TaskStepForm(forms.ModelForm):
+    # Дополнительные поля вместо сырого JSON settings
+    correct_article = forms.CharField(
+        label='Правильный артикул',
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: 12345678'}),
+    )
+    min_length = forms.IntegerField(
+        label='Мин. длина текста',
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 120px'}),
+    )
+    choices_text = forms.CharField(
+        label='Варианты выбора',
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Один вариант на строку'}),
+    )
+
     class Meta:
         model = TaskStep
         fields = [
             'order', 'title', 'step_type', 'instruction', 'image',
-            'settings', 'publish_time', 'timeout_minutes',
+            'publish_time', 'timeout_minutes',
             'reminder_minutes', 'reminder_text', 'requires_moderation',
         ]
         widgets = {
@@ -52,19 +69,44 @@ class TaskStepForm(forms.ModelForm):
             'step_type': forms.Select(attrs={'class': 'form-select'}),
             'instruction': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'settings': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '{"key": "value"}'}),
             'publish_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
-            'timeout_minutes': forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 100px'}),
-            'reminder_minutes': forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 100px'}),
+            'timeout_minutes': forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 120px'}),
+            'reminder_minutes': forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 120px'}),
             'reminder_text': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'requires_moderation': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
-    def clean_settings(self):
-        value = self.cleaned_data.get('settings')
-        if not value:
-            return {}
-        return value
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            settings = self.instance.settings or {}
+            self.fields['correct_article'].initial = settings.get('correct_article', '')
+            self.fields['min_length'].initial = settings.get('min_length')
+            choices = settings.get('choices', [])
+            self.fields['choices_text'].initial = '\n'.join(choices) if choices else ''
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        settings = {}
+        step_type = self.cleaned_data.get('step_type', '')
+
+        if step_type == StepType.ARTICLE_CHECK:
+            val = self.cleaned_data.get('correct_article', '').strip()
+            if val:
+                settings['correct_article'] = val
+        elif step_type == StepType.TEXT_MODERATED:
+            val = self.cleaned_data.get('min_length')
+            if val:
+                settings['min_length'] = val
+        elif step_type == StepType.CHOICE:
+            text = self.cleaned_data.get('choices_text', '').strip()
+            if text:
+                settings['choices'] = [line.strip() for line in text.splitlines() if line.strip()]
+
+        instance.settings = settings
+        if commit:
+            instance.save()
+        return instance
 
 
 TaskStepFormSet = inlineformset_factory(
