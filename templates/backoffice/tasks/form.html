@@ -48,7 +48,10 @@
         {% for step_form in formset %}
         <div class="step-form border rounded p-3 mb-3 {% if step_form.errors %}border-danger{% endif %}">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <strong>Шаг {{ forloop.counter }}</strong>
+            <div class="d-flex align-items-center gap-2">
+              <span class="drag-handle text-muted" style="cursor: grab"><i class="bi bi-grip-vertical fs-5"></i></span>
+              <strong class="step-number">Шаг {{ forloop.counter }}</strong>
+            </div>
             {% if step_form.instance.pk %}
             <div class="form-check">
               {{ step_form.DELETE }}
@@ -60,7 +63,7 @@
           <div class="row g-2">
             {% for field in step_form.visible_fields %}
               {% if field.name != 'DELETE' %}
-              <div class="{% if field.name == 'instruction' or field.name == 'reminder_text' %}col-12{% elif field.name == 'requires_moderation' %}col-12{% else %}col-md-6{% endif %}">
+              <div class="{% if field.name == 'instruction' or field.name == 'reminder_text' %}col-12{% elif field.name == 'requires_moderation' %}col-12{% else %}col-md-6{% endif %} {% if field.name == 'publish_time' %}publish-time-field{% endif %} {% if field.name == 'settings' %}settings-field{% endif %}">
                 {% if field.name == 'requires_moderation' %}
                 <div class="form-check mt-2">
                   {{ field }}
@@ -93,22 +96,62 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <script>
-document.getElementById('add-step').addEventListener('click', function() {
-    const container = document.getElementById('steps-container');
-    const totalForms = document.getElementById('id_steps-TOTAL_FORMS');
-    const formCount = parseInt(totalForms.value);
+// --- Recalculate order numbers after drag ---
+function updateOrder() {
+    document.querySelectorAll('#steps-container .step-form').forEach(function(form, i) {
+        form.querySelector('.step-number').textContent = 'Шаг ' + (i + 1);
+        var orderField = form.querySelector('[name$="-order"]');
+        if (orderField) orderField.value = i + 1;
+    });
+}
 
-    const lastForm = container.querySelector('.step-form:last-child');
+// --- SortableJS drag & drop ---
+Sortable.create(document.getElementById('steps-container'), {
+    handle: '.drag-handle',
+    animation: 200,
+    onEnd: updateOrder,
+});
+
+// --- Show/hide fields based on step type ---
+var TYPE_FIELDS = {
+    'publish_time': ['publish_review'],
+    'settings': ['article_check', 'text_moderated', 'choice'],
+};
+
+function toggleConditionalFields(stepForm) {
+    var typeSelect = stepForm.querySelector('[name$="-step_type"]');
+    if (!typeSelect) return;
+
+    function apply() {
+        for (var cls in TYPE_FIELDS) {
+            var el = stepForm.querySelector('.' + cls + '-field');
+            if (el) {
+                el.style.display = TYPE_FIELDS[cls].indexOf(typeSelect.value) !== -1 ? '' : 'none';
+            }
+        }
+    }
+    apply();
+    typeSelect.addEventListener('change', apply);
+}
+document.querySelectorAll('.step-form').forEach(toggleConditionalFields);
+
+// --- Add new step ---
+document.getElementById('add-step').addEventListener('click', function() {
+    var container = document.getElementById('steps-container');
+    var totalForms = document.getElementById('id_steps-TOTAL_FORMS');
+    var formCount = parseInt(totalForms.value);
+
+    var lastForm = container.querySelector('.step-form:last-child');
     if (!lastForm) return;
 
-    const newForm = lastForm.cloneNode(true);
+    var newForm = lastForm.cloneNode(true);
     newForm.classList.remove('border-danger');
-    newForm.querySelector('strong').textContent = 'Шаг ' + (formCount + 1);
 
     newForm.querySelectorAll('input, select, textarea').forEach(function(input) {
-        const name = input.name.replace(/-\d+-/, '-' + formCount + '-');
-        const id = input.id.replace(/-\d+-/, '-' + formCount + '-');
+        var name = input.name.replace(/-\d+-/, '-' + formCount + '-');
+        var id = input.id.replace(/-\d+-/, '-' + formCount + '-');
         input.name = name;
         input.id = id;
         if (input.type === 'checkbox') {
@@ -119,24 +162,26 @@ document.getElementById('add-step').addEventListener('click', function() {
     });
 
     newForm.querySelectorAll('label').forEach(function(label) {
-        const forAttr = label.getAttribute('for');
+        var forAttr = label.getAttribute('for');
         if (forAttr) {
             label.setAttribute('for', forAttr.replace(/-\d+-/, '-' + formCount + '-'));
         }
     });
 
     // Remove delete checkbox for new forms
-    const deleteCheck = newForm.querySelector('.form-check');
+    var deleteCheck = newForm.querySelector('.form-check');
     if (deleteCheck) deleteCheck.remove();
 
-    // Clear hidden id field (new form)
-    const idField = newForm.querySelector('[name$="-id"]');
+    // Clear hidden id field
+    var idField = newForm.querySelector('[name$="-id"]');
     if (idField) idField.value = '';
 
-    newForm.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+    newForm.querySelectorAll('.invalid-feedback').forEach(function(el) { el.remove(); });
 
     container.appendChild(newForm);
     totalForms.value = formCount + 1;
+    updateOrder();
+    toggleConditionalFields(newForm);
 });
 </script>
 {% endblock %}

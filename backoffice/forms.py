@@ -47,7 +47,7 @@ class TaskStepForm(forms.ModelForm):
             'reminder_minutes', 'reminder_text', 'requires_moderation',
         ]
         widgets = {
-            'order': forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 80px'}),
+            'order': forms.HiddenInput(),
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'step_type': forms.Select(attrs={'class': 'form-select'}),
             'instruction': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
