@@ -11,11 +11,8 @@ from steps.models import StepType
 
 
 @receiver(post_save, sender=BuybackResponse)
-def on_response_approved(sender, instance, **kwargs):
-    """При одобрении ответа модератором"""
-
-    if instance.status != BuybackResponse.Status.APPROVED:
-        return
+def on_response_moderated(sender, instance, **kwargs):
+    """При модерации ответа (одобрение или отклонение)"""
 
     buyback = instance.buyback
 
@@ -23,6 +20,28 @@ def on_response_approved(sender, instance, **kwargs):
         return
 
     if instance.step.order != buyback.current_step:
+        return
+
+    # Отклонение — возвращаем на текущий шаг
+    if instance.status == BuybackResponse.Status.REJECTED:
+        buyback.status = Buyback.Status.IN_PROGRESS
+        buyback.step_started_at = timezone.now()
+        buyback.reminder_sent = False
+        buyback.save(update_fields=['status', 'step_started_at', 'reminder_sent'])
+
+        text = (
+            '❌ <b>Ответ отклонён</b>\n\n'
+            f'📦 <b>{buyback.task.title}</b>\n'
+            f'Шаг {instance.step.order}: {instance.step.title or instance.step.get_step_type_display()}\n\n'
+        )
+        if instance.moderator_comment:
+            text += f'💬 <b>Причина:</b> {instance.moderator_comment}\n\n'
+        text += 'Пожалуйста, отправь ответ заново.'
+
+        send_telegram_message(buyback.user.telegram_id, text)
+        return
+
+    if instance.status != BuybackResponse.Status.APPROVED:
         return
 
     next_step = buyback.task.steps.filter(order__gt=buyback.current_step).order_by('order').first()
