@@ -94,7 +94,7 @@
 
           {% if resp.response_data.photo %}
           <div class="mt-2">
-            <img src="/media/{{ resp.response_data.photo }}" alt="Фото" class="img-thumbnail" style="max-width: 300px; max-height: 300px">
+            <img src="/media/{{ resp.response_data.photo }}" alt="Фото" class="img-thumbnail photo-zoom" style="max-width: 300px; max-height: 300px; cursor: zoom-in">
           </div>
           {% endif %}
 
@@ -162,4 +162,24 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Photo zoom modal -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content bg-transparent border-0">
+      <div class="modal-body p-0 text-center">
+        <img src="" alt="Фото" id="photoModalImg" class="img-fluid" style="max-height: 90vh; cursor: zoom-out" data-bs-dismiss="modal">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.photo-zoom').forEach(function(img) {
+  img.addEventListener('click', function() {
+    document.getElementById('photoModalImg').src = this.src;
+    new bootstrap.Modal(document.getElementById('photoModal')).show();
+  });
+});
+</script>
 {% endblock %}
