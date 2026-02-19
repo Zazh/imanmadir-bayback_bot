@@ -15,7 +15,7 @@ def tasks_list_keyboard(tasks):
     for task in tasks:
         buttons.append([
             InlineKeyboardButton(
-                f'📦 {task.title} — {task.payout}₸',
+                f'📦 {task.title} — {task.payout}₽',
                 callback_data=f'task:{task.id}',
             )
         ])

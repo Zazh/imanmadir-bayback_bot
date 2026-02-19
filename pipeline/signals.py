@@ -96,7 +96,7 @@ def on_buyback_status_change(sender, instance, **kwargs):
             text = (
                 '🎉 <b>Выкуп одобрен!</b>\n\n'
                 f'Задание: {instance.task.title}\n'
-                f'Сумма к выплате: <b>{instance.task.payout}₸</b>\n\n'
+                f'Сумма к выплате: <b>{instance.task.payout}₽</b>\n\n'
                 'Выплата поступит в ближайшее время.'
             )
             send_telegram_message(instance.user.telegram_id, text)

@@ -43,7 +43,7 @@
         <tr>
           <td>{{ payout.pk }}</td>
           <td><a href="{% url 'backoffice:user_detail' payout.user.pk %}">{{ payout.user }}</a></td>
-          <td class="fw-bold">{{ payout.amount }} &#8376;</td>
+          <td class="fw-bold">{{ payout.amount }} ₽</td>
           <td>
             <div>{{ payout.payment_bank }}</div>
             <div class="small text-muted">{{ payout.payment_phone }}</div>

@@ -66,8 +66,8 @@ async def task_detail_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     text = (
         f'📦 <b>{task.title}</b>\n\n'
         f'🏷 Товар: {task.product.name}\n'
-        f'💰 Цена: {task.product.price}₸\n'
-        f'💵 Выплата: <b>{task.payout}₸</b>\n\n'
+        f'💰 Цена: {task.product.price}₽\n'
+        f'💵 Выплата: <b>{task.payout}₽</b>\n\n'
         f'📝 Шагов: {steps_count}\n'
         f'📊 Осталось: {available} шт.\n'
         f'👤 Лимит: {task.product.get_limit_display()}'

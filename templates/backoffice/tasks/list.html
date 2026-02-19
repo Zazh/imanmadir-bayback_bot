@@ -47,7 +47,7 @@
         <tr>
           <td><a href="{% url 'backoffice:task_detail' task.pk %}">{{ task.title }}</a></td>
           <td>{{ task.product.name }}</td>
-          <td>{{ task.payout }} &#8376;</td>
+          <td>{{ task.payout }} ₽</td>
           <td>
             {% if task.is_active %}
             <span class="badge bg-success">Активно</span>

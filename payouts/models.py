@@ -83,7 +83,7 @@ class Payout(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'Выплата #{self.id} — {self.amount}₸ — {self.user}'
+        return f'Выплата #{self.id} — {self.amount}₽ — {self.user}'
 
     def mark_completed(self, manager=None):
         """Отметить как выплачено"""
