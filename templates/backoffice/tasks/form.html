@@ -53,9 +53,11 @@
               <strong class="step-number">Шаг {{ forloop.counter }}</strong>
             </div>
             {% if step_form.instance.pk %}
-            <div class="form-check">
-              {{ step_form.DELETE }}
-              <label class="form-check-label text-danger small" for="{{ step_form.DELETE.id_for_label }}">Удалить</label>
+            <div class="delete-check">
+              <div class="form-check">
+                {{ step_form.DELETE }}
+                <label class="form-check-label text-danger small" for="{{ step_form.DELETE.id_for_label }}">Удалить</label>
+              </div>
             </div>
             {% endif %}
           </div>
@@ -116,7 +118,7 @@ Sortable.create(document.getElementById('steps-container'), {
 
 // --- Show/hide fields based on step type ---
 var TYPE_FIELDS = {
-    'publish_time': ['publish_review'],
+    'publish-time': ['publish_review'],
     'settings': ['article_check', 'text_moderated', 'choice'],
 };
 
@@ -169,7 +171,7 @@ document.getElementById('add-step').addEventListener('click', function() {
     });
 
     // Remove delete checkbox for new forms
-    var deleteCheck = newForm.querySelector('.form-check');
+    var deleteCheck = newForm.querySelector('.delete-check');
     if (deleteCheck) deleteCheck.remove();
 
     // Clear hidden id field
