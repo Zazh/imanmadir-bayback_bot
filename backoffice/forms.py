@@ -52,13 +52,19 @@ class TaskStepForm(forms.ModelForm):
             'step_type': forms.Select(attrs={'class': 'form-select'}),
             'instruction': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'settings': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'settings': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '{"key": "value"}'}),
             'publish_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'timeout_minutes': forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 100px'}),
             'reminder_minutes': forms.NumberInput(attrs={'class': 'form-control', 'style': 'width: 100px'}),
             'reminder_text': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'requires_moderation': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def clean_settings(self):
+        value = self.cleaned_data.get('settings')
+        if not value:
+            return {}
+        return value
 
 
 TaskStepFormSet = inlineformset_factory(
