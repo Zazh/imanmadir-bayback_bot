@@ -121,3 +121,104 @@ async def cancel_buyback_reminders(application, buyback: Buyback):
     """Отменить все напоминания при завершении шага"""
     from asgiref.sync import sync_to_async
     await sync_to_async(cancel_reminders_for_buyback)(buyback)
+
+
+async def check_timeouts_job(context: ContextTypes.DEFAULT_TYPE):
+    """Периодическая проверка таймаутов шагов — помечаем как EXPIRED"""
+    from steps.models import TaskStep
+
+    buybacks = Buyback.objects.filter(
+        status=Buyback.Status.IN_PROGRESS,
+        step_started_at__isnull=False,
+    ).select_related('user', 'task')
+
+    async for buyback in buybacks:
+        step = await TaskStep.objects.filter(
+            task_id=buyback.task_id,
+            order=buyback.current_step,
+        ).afirst()
+
+        if not step or not step.timeout_minutes:
+            continue
+
+        deadline = buyback.step_started_at + timedelta(minutes=step.timeout_minutes)
+        if timezone.now() <= deadline:
+            continue
+
+        # Таймаут истёк
+        buyback.status = Buyback.Status.EXPIRED
+        await buyback.asave(update_fields=['status'])
+
+        try:
+            await context.bot.send_message(
+                chat_id=buyback.user.telegram_id,
+                text=(
+                    f'⏰ <b>Время истекло!</b>\n\n'
+                    f'Задание «{buyback.task.title}» отменено — '
+                    f'шаг не выполнен за {step.timeout_minutes} мин.'
+                ),
+                parse_mode='HTML',
+            )
+            print(f'[TIMEOUT] Buyback #{buyback.id} expired')
+        except Exception as e:
+            print(f'[TIMEOUT] Error notifying {buyback.user.telegram_id}: {e}')
+
+
+async def check_step_reminders_job(context: ContextTypes.DEFAULT_TYPE):
+    """Периодическая отправка напоминаний по шагам (reminder_minutes)"""
+    from steps.models import TaskStep
+
+    buybacks = Buyback.objects.filter(
+        status=Buyback.Status.IN_PROGRESS,
+        step_started_at__isnull=False,
+        reminder_sent=False,
+    ).select_related('user', 'task')
+
+    async for buyback in buybacks:
+        step = await TaskStep.objects.filter(
+            task_id=buyback.task_id,
+            order=buyback.current_step,
+        ).afirst()
+
+        if not step or not step.reminder_minutes:
+            continue
+
+        remind_at = buyback.step_started_at + timedelta(minutes=step.reminder_minutes)
+        if timezone.now() < remind_at:
+            continue
+
+        # Пора напомнить
+        buyback.reminder_sent = True
+        await buyback.asave(update_fields=['reminder_sent'])
+
+        # Формируем текст
+        if step.reminder_text:
+            remaining = ''
+            if step.timeout_minutes:
+                left = step.timeout_minutes - step.reminder_minutes
+                if left > 0:
+                    remaining = f'{left} мин'
+            text = step.reminder_text.format(
+                remaining_time=remaining,
+                task_title=buyback.task.title,
+                step_title=step.title or f'Шаг {step.order}',
+            )
+        else:
+            text = (
+                f'⏰ <b>Напоминание</b>\n\n'
+                f'Не забудь выполнить шаг в задании «{buyback.task.title}».'
+            )
+            if step.timeout_minutes:
+                left = step.timeout_minutes - step.reminder_minutes
+                if left > 0:
+                    text += f'\nОсталось времени: {left} мин.'
+
+        try:
+            await context.bot.send_message(
+                chat_id=buyback.user.telegram_id,
+                text=text,
+                parse_mode='HTML',
+            )
+            print(f'[STEP_REMINDER] Sent to {buyback.user.telegram_id} for buyback #{buyback.id}')
+        except Exception as e:
+            print(f'[STEP_REMINDER] Error: {e}')

@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 import requests
 
 from .models import Buyback, BuybackResponse
@@ -29,7 +30,9 @@ def on_response_approved(sender, instance, **kwargs):
     if next_step:
         buyback.current_step = next_step.order
         buyback.status = Buyback.Status.IN_PROGRESS
-        buyback.save(update_fields=['current_step', 'status'])
+        buyback.step_started_at = timezone.now()
+        buyback.reminder_sent = False
+        buyback.save(update_fields=['current_step', 'status', 'step_started_at', 'reminder_sent'])
 
         total_steps = buyback.task.steps.count()
 

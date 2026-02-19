@@ -109,6 +109,11 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, buyback:
     task = await Task.objects.aget(id=buyback.task_id)
     total_steps = await task.steps.acount()
 
+    # Фиксируем время начала шага и сбрасываем флаг напоминания
+    buyback.step_started_at = timezone.now()
+    buyback.reminder_sent = False
+    await buyback.asave(update_fields=['step_started_at', 'reminder_sent'])
+
     # Для шага публикации отзыва — запускаем систему напоминаний
     if step.step_type == StepType.PUBLISH_REVIEW and step.publish_time:
         # Загружаем user для напоминаний
@@ -204,6 +209,20 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except (Buyback.DoesNotExist, TaskStep.DoesNotExist):
         await update.message.reply_text('⚠️ Ошибка. Начни заново.')
         return ConversationHandler.END
+
+    # Проверка таймаута
+    if step.timeout_minutes and buyback.step_started_at:
+        from datetime import timedelta
+        deadline = buyback.step_started_at + timedelta(minutes=step.timeout_minutes)
+        if timezone.now() > deadline:
+            buyback.status = Buyback.Status.EXPIRED
+            await buyback.asave(update_fields=['status'])
+            await update.message.reply_text(
+                '⏰ Время на выполнение этого шага истекло. Выкуп отменён.',
+                reply_markup=main_menu_keyboard(),
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
 
     if step_type in (StepType.PHOTO, StepType.PUBLISH_REVIEW):
         if not update.message.photo:
@@ -336,6 +355,18 @@ async def advance_to_next_step(update: Update, context: ContextTypes.DEFAULT_TYP
     return ConversationHandler.END
 
 
+async def check_step_timeout(buyback, step):
+    """Проверка истёк ли таймаут шага"""
+    if step.timeout_minutes and buyback.step_started_at:
+        from datetime import timedelta
+        deadline = buyback.step_started_at + timedelta(minutes=step.timeout_minutes)
+        if timezone.now() > deadline:
+            buyback.status = Buyback.Status.EXPIRED
+            await buyback.asave(update_fields=['status'])
+            return True
+    return False
+
+
 async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Кнопка подтверждения"""
     query = update.callback_query
@@ -348,6 +379,11 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         step = await TaskStep.objects.aget(task_id=buyback.task_id, order=buyback.current_step)
     except (Buyback.DoesNotExist, TaskStep.DoesNotExist):
         await query.edit_message_text('⚠️ Ошибка')
+        return ConversationHandler.END
+
+    if await check_step_timeout(buyback, step):
+        await query.edit_message_text('⏰ Время на выполнение этого шага истекло. Выкуп отменён.')
+        context.user_data.clear()
         return ConversationHandler.END
 
     context.user_data['buyback_id'] = buyback.id
@@ -378,6 +414,11 @@ async def choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         step = await TaskStep.objects.aget(task_id=buyback.task_id, order=buyback.current_step)
     except (Buyback.DoesNotExist, TaskStep.DoesNotExist):
         await query.edit_message_text('⚠️ Ошибка')
+        return ConversationHandler.END
+
+    if await check_step_timeout(buyback, step):
+        await query.edit_message_text('⏰ Время на выполнение этого шага истекло. Выкуп отменён.')
+        context.user_data.clear()
         return ConversationHandler.END
 
     context.user_data['buyback_id'] = buyback.id

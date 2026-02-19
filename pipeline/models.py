@@ -47,6 +47,17 @@ class Buyback(models.Model):
         blank=True,
     )
 
+    step_started_at = models.DateTimeField(
+        'Начало текущего шага',
+        null=True,
+        blank=True,
+        help_text='Когда пользователь начал текущий шаг',
+    )
+    reminder_sent = models.BooleanField(
+        'Напоминание отправлено',
+        default=False,
+    )
+
     started_at = models.DateTimeField(
         'Дата начала',
         auto_now_add=True,
