@@ -16,6 +16,9 @@
   <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
       <h5 class="card-title mb-3">{% if task %}Редактировать задание{% else %}Новое задание{% endif %}</h5>
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger">{% for error in form.non_field_errors %}{{ error }}{% endfor %}</div>
+      {% endif %}
       {% for field in form %}
       <div class="mb-3 {% if field.name == 'is_active' %}form-check{% endif %}">
         {% if field.name == 'is_active' %}
@@ -61,7 +64,19 @@
             </div>
             {% endif %}
           </div>
-          {% for hidden in step_form.hidden_fields %}{{ hidden }}{% endfor %}
+          {% if step_form.non_field_errors %}
+          <div class="alert alert-danger py-1 small mb-2">
+            {% for error in step_form.non_field_errors %}{{ error }}{% endfor %}
+          </div>
+          {% endif %}
+          {% for hidden in step_form.hidden_fields %}
+            {{ hidden }}
+            {% if hidden.errors %}
+            <div class="alert alert-danger py-1 small mb-2">
+              <strong>{{ hidden.label }}:</strong> {% for error in hidden.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          {% endfor %}
           <div class="row g-2">
             {% for field in step_form.visible_fields %}
               {% if field.name != 'DELETE' %}
