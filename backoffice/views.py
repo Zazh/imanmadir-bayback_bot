@@ -278,13 +278,11 @@ class ModerationDetailView(StaffRequiredMixin, View):
             BuybackResponse.objects.select_related('buyback', 'buyback__task', 'buyback__user', 'step'),
             pk=pk,
         )
-        has_publish_review = response.buyback.task.steps.filter(
-            step_type=StepType.PUBLISH_REVIEW,
-        ).exists()
+        is_publish_review = response.step.step_type == StepType.PUBLISH_REVIEW
         return render(request, 'backoffice/moderation/detail.html', {
             'response': response,
             'form': ModerationForm(),
-            'has_publish_review': has_publish_review,
+            'is_publish_review': is_publish_review,
         })
 
     def post(self, request, pk):
