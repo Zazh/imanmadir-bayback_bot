@@ -278,11 +278,15 @@ class ModerationDetailView(StaffRequiredMixin, View):
             BuybackResponse.objects.select_related('buyback', 'buyback__task', 'buyback__user', 'step'),
             pk=pk,
         )
-        is_publish_review = response.step.step_type == StepType.PUBLISH_REVIEW
+        # Показываем поля даты если следующий шаг — публикация отзыва
+        next_step = response.buyback.task.steps.filter(
+            order__gt=response.step.order,
+        ).order_by('order').first()
+        next_is_publish_review = next_step and next_step.step_type == StepType.PUBLISH_REVIEW
         return render(request, 'backoffice/moderation/detail.html', {
             'response': response,
             'form': ModerationForm(),
-            'is_publish_review': is_publish_review,
+            'show_publish_date': next_is_publish_review,
         })
 
     def post(self, request, pk):
