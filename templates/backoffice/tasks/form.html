@@ -155,6 +155,21 @@ function toggleConditionalFields(stepForm) {
     typeSelect.addEventListener('change', apply);
 }
 document.querySelectorAll('.step-form').forEach(toggleConditionalFields);
+updateOrder();
+
+// --- On submit: set order for filled forms, clear for empty ---
+document.querySelector('form').addEventListener('submit', function() {
+    document.querySelectorAll('#steps-container .step-form').forEach(function(form, i) {
+        var typeSelect = form.querySelector('[name$="-step_type"]');
+        var orderField = form.querySelector('[name$="-order"]');
+        if (!orderField) return;
+        if (typeSelect && typeSelect.value) {
+            orderField.value = i + 1;
+        } else {
+            orderField.value = '';
+        }
+    });
+});
 
 // --- Add new step ---
 document.getElementById('add-step').addEventListener('click', function() {
