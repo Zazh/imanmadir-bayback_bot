@@ -29,6 +29,7 @@ urlpatterns = [
     # Moderation
     path('moderation/', views.ModerationListView.as_view(), name='moderation_list'),
     path('moderation/<int:pk>/', views.ModerationDetailView.as_view(), name='moderation_detail'),
+    path('moderation/buyback/<int:pk>/', views.BuybackModerationDetailView.as_view(), name='moderation_buyback_detail'),
 
     # Payouts
     path('payouts/', views.PayoutListView.as_view(), name='payout_list'),

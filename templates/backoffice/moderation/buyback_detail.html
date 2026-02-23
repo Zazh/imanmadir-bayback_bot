@@ -1,0 +1,185 @@
+{% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
+
+{% block title %}Проверка выкупа #{{ buyback.pk }} — BayBack{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'backoffice:moderation_list' %}?tab=buybacks">Модерация</a></li>
+    <li class="breadcrumb-item active">Выкуп #{{ buyback.pk }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">Выкуп #{{ buyback.pk }}</h4>
+  <span class="badge bg-{{ buyback.status|status_badge }} fs-6">{{ buyback.get_status_display }}</span>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Задание</h6>
+        <a href="{% url 'backoffice:task_detail' buyback.task.pk %}">{{ buyback.task.title }}</a>
+        <div class="small text-muted mt-1">{{ buyback.task.product.name }} ({{ buyback.task.product.wb_article }})</div>
+        <div class="mt-2 fw-bold">Выплата: {{ buyback.task.payout }} ₽</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Пользователь</h6>
+        <a href="{% url 'backoffice:user_detail' buyback.user.pk %}">{{ buyback.user }}</a>
+        {% if buyback.user.phone %}
+        <div class="small text-muted mt-1">{{ buyback.user.phone }} ({{ buyback.user.bank_name }})</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted">Прогресс</h6>
+        <div>Текущий шаг: <strong>{{ buyback.current_step }}</strong> из {{ steps|length }}</div>
+        <div class="progress mt-2" style="height: 8px">
+          {% widthratio buyback.current_step steps|length 100 as pct %}
+          <div class="progress-bar" style="width: {{ pct }}%"></div>
+        </div>
+        <div class="small text-muted mt-2">
+          Начало: {{ buyback.started_at|date:"d.m.Y H:i" }}
+          {% if buyback.completed_at %}<br>Завершён: {{ buyback.completed_at|date:"d.m.Y H:i" }}{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if buyback.rejection_reason %}
+<div class="alert alert-danger">
+  <strong>Причина отклонения:</strong> {{ buyback.rejection_reason }}
+</div>
+{% endif %}
+
+{% if buyback.admin_notes %}
+<div class="alert alert-info">
+  <strong>Заметки:</strong> {{ buyback.admin_notes }}
+</div>
+{% endif %}
+
+<!-- Responses -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white">
+    <h6 class="mb-0">Ответы пользователя</h6>
+  </div>
+  <div class="card-body">
+    {% for step in steps %}
+    <div class="border rounded p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <span class="badge bg-light text-dark me-2">Шаг {{ step.order }}</span>
+          <strong>{{ step.title|default:step.get_step_type_display }}</strong>
+        </div>
+      </div>
+      <div class="text-muted small mt-1">{{ step.instruction|truncatechars:100 }}</div>
+
+      {% for resp in responses %}
+        {% if resp.step_id == step.pk %}
+        <div class="mt-2 p-2 bg-light rounded">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="badge bg-{{ resp.status|status_badge }}">{{ resp.get_status_display }}</span>
+            <small class="text-muted">{{ resp.created_at|date:"d.m.Y H:i" }}</small>
+          </div>
+
+          {% if resp.response_data.photo %}
+          <div class="mt-2">
+            <img src="/media/{{ resp.response_data.photo }}" alt="Фото" class="img-thumbnail photo-zoom" style="max-width: 300px; max-height: 300px; cursor: zoom-in">
+          </div>
+          {% endif %}
+
+          {% if resp.response_data.text %}
+          <div class="mt-2"><strong>Текст:</strong> {{ resp.response_data.text }}</div>
+          {% endif %}
+
+          {% if resp.response_data.value %}
+          <div class="mt-2"><strong>Значение:</strong> {{ resp.response_data.value }}</div>
+          {% endif %}
+
+          {% if resp.response_data.phone %}
+          <div class="mt-2"><strong>Телефон:</strong> {{ resp.response_data.phone }}</div>
+          {% endif %}
+
+          {% if resp.response_data.bank %}
+          <div class="mt-2"><strong>Банк:</strong> {{ resp.response_data.bank }}</div>
+          {% endif %}
+
+          {% if resp.response_data.name %}
+          <div class="mt-2"><strong>ФИО:</strong> {{ resp.response_data.name }}</div>
+          {% endif %}
+
+          {% if resp.moderator_comment %}
+          <div class="mt-2 text-info"><strong>Комментарий модератора:</strong> {{ resp.moderator_comment }}</div>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Actions -->
+{% if buyback.status == 'pending_review' %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <h6 class="mb-0">Действия</h6>
+  </div>
+  <div class="card-body">
+    <form method="post" class="d-inline">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="approve">
+      <button type="submit" class="btn btn-success me-2" onclick="return confirm('Одобрить выкуп?')">
+        <i class="bi bi-check-lg"></i> Одобрить
+      </button>
+    </form>
+
+    <button class="btn btn-danger" type="button" data-bs-toggle="collapse" data-bs-target="#rejectForm">
+      <i class="bi bi-x-lg"></i> Отклонить
+    </button>
+
+    <div class="collapse mt-3" id="rejectForm">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reject">
+        <div class="mb-3">
+          <label class="form-label">Причина отклонения</label>
+          <textarea name="rejection_reason" class="form-control" rows="3" placeholder="Укажите причину..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-danger">Отклонить выкуп</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Photo zoom modal -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content bg-transparent border-0">
+      <div class="modal-body p-0 text-center">
+        <img src="" alt="Фото" id="photoModalImg" class="img-fluid" style="max-height: 90vh; cursor: zoom-out" data-bs-dismiss="modal">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.photo-zoom').forEach(function(img) {
+  img.addEventListener('click', function() {
+    document.getElementById('photoModalImg').src = this.src;
+    new bootstrap.Modal(document.getElementById('photoModal')).show();
+  });
+});
+</script>
+{% endblock %}

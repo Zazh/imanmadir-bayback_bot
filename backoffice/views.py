@@ -244,12 +244,32 @@ class BuybackDetailView(StaffRequiredMixin, View):
 
 class ModerationListView(StaffRequiredMixin, View):
     def get(self, request):
-        qs = BuybackResponse.objects.filter(
+        tab = request.GET.get('tab', 'responses')
+
+        responses_count = BuybackResponse.objects.filter(
             status=BuybackResponse.Status.PENDING,
-        ).select_related('buyback', 'buyback__task', 'buyback__user', 'step')
+        ).count()
+        buybacks_count = Buyback.objects.filter(
+            status=Buyback.Status.PENDING_REVIEW,
+        ).count()
+
+        if tab == 'buybacks':
+            qs = Buyback.objects.filter(
+                status=Buyback.Status.PENDING_REVIEW,
+            ).select_related('task', 'user', 'task__product').order_by('-completed_at')
+        else:
+            qs = BuybackResponse.objects.filter(
+                status=BuybackResponse.Status.PENDING,
+            ).select_related('buyback', 'buyback__task', 'buyback__user', 'step')
+
         paginator = Paginator(qs, 20)
         page = paginator.get_page(request.GET.get('page'))
-        return render(request, 'backoffice/moderation/list.html', {'page': page})
+        return render(request, 'backoffice/moderation/list.html', {
+            'page': page,
+            'tab': tab,
+            'responses_count': responses_count,
+            'buybacks_count': buybacks_count,
+        })
 
 
 class ModerationDetailView(StaffRequiredMixin, View):
@@ -275,6 +295,35 @@ class ModerationDetailView(StaffRequiredMixin, View):
                 response.status = BuybackResponse.Status.REJECTED
             response.save(update_fields=['status', 'moderator_comment'])
         return redirect('backoffice:moderation_list')
+
+
+class BuybackModerationDetailView(StaffRequiredMixin, View):
+    def get(self, request, pk):
+        buyback = get_object_or_404(
+            Buyback.objects.select_related('task', 'user', 'task__product'),
+            pk=pk,
+        )
+        responses = buyback.responses.select_related('step').order_by('step__order')
+        steps = buyback.task.steps.all().order_by('order')
+        return render(request, 'backoffice/moderation/buyback_detail.html', {
+            'buyback': buyback,
+            'responses': responses,
+            'steps': steps,
+            'action_form': BuybackActionForm(),
+        })
+
+    def post(self, request, pk):
+        buyback = get_object_or_404(Buyback, pk=pk)
+        form = BuybackActionForm(request.POST)
+        if form.is_valid():
+            action = form.cleaned_data['action']
+            if action == 'approve' and buyback.status == Buyback.Status.PENDING_REVIEW:
+                buyback.status = Buyback.Status.APPROVED
+                buyback.save(update_fields=['status'])
+            elif action == 'reject':
+                reason = form.cleaned_data.get('rejection_reason', '')
+                buyback.reject(reason)
+        return redirect(f'/backoffice/moderation/?tab=buybacks')
 
 
 # ─── Payouts ─────────────────────────────────────────────────────────────────
