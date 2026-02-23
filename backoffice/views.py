@@ -9,7 +9,7 @@ from account.models import TelegramUser
 from catalog.models import Product, Task
 from payouts.models import Payout
 from pipeline.models import Buyback, BuybackResponse
-from steps.models import TaskStep
+from steps.models import TaskStep, StepType
 
 from .forms import (
     ProductForm, TaskForm, TaskStepFormSet,
@@ -278,12 +278,20 @@ class ModerationDetailView(StaffRequiredMixin, View):
             BuybackResponse.objects.select_related('buyback', 'buyback__task', 'buyback__user', 'step'),
             pk=pk,
         )
+        has_publish_review = response.buyback.task.steps.filter(
+            step_type=StepType.PUBLISH_REVIEW,
+        ).exists()
         return render(request, 'backoffice/moderation/detail.html', {
-            'response': response, 'form': ModerationForm(),
+            'response': response,
+            'form': ModerationForm(),
+            'has_publish_review': has_publish_review,
         })
 
     def post(self, request, pk):
-        response = get_object_or_404(BuybackResponse, pk=pk)
+        response = get_object_or_404(
+            BuybackResponse.objects.select_related('buyback'),
+            pk=pk,
+        )
         form = ModerationForm(request.POST)
         if form.is_valid() and response.status == BuybackResponse.Status.PENDING:
             action = form.cleaned_data['action']
@@ -291,6 +299,16 @@ class ModerationDetailView(StaffRequiredMixin, View):
             response.moderator_comment = comment
             if action == 'approve':
                 response.status = BuybackResponse.Status.APPROVED
+                # Сохраняем кастомную дату публикации если указана
+                pub_date = form.cleaned_data.get('publish_date')
+                pub_time = form.cleaned_data.get('publish_time')
+                if pub_date and pub_time:
+                    import pytz
+                    from datetime import datetime
+                    msk = pytz.timezone('Europe/Moscow')
+                    publish_dt = msk.localize(datetime.combine(pub_date, pub_time))
+                    response.buyback.custom_publish_at = publish_dt
+                    response.buyback.save(update_fields=['custom_publish_at'])
             elif action == 'reject':
                 response.status = BuybackResponse.Status.REJECTED
             response.save(update_fields=['status', 'moderator_comment'])

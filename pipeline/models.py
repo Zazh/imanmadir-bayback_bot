@@ -47,6 +47,13 @@ class Buyback(models.Model):
         blank=True,
     )
 
+    custom_publish_at = models.DateTimeField(
+        'Назначенное время публикации',
+        null=True,
+        blank=True,
+        help_text='Если задано — используется вместо стандартного времени из шага',
+    )
+
     step_started_at = models.DateTimeField(
         'Начало текущего шага',
         null=True,

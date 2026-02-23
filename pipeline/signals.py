@@ -6,7 +6,7 @@ import requests
 
 from .models import Buyback, BuybackResponse
 from .services import format_step_message
-from .reminder_service import create_reminders_for_step
+from .reminder_service import create_reminders_for_step, get_publish_time_display
 from steps.models import StepType
 
 
@@ -56,11 +56,11 @@ def on_response_moderated(sender, instance, **kwargs):
         total_steps = buyback.task.steps.count()
 
         # Для шага публикации отзыва — особая обработка
-        if next_step.step_type == StepType.PUBLISH_REVIEW and next_step.publish_time:
+        if next_step.step_type == StepType.PUBLISH_REVIEW and (buyback.custom_publish_at or next_step.publish_time):
             # Создаём напоминания
             create_reminders_for_step(buyback, next_step)
 
-            publish_time_str = next_step.publish_time.strftime('%H:%M')
+            time_display = get_publish_time_display(buyback, next_step)
             text = (
                 '✅ <b>Модератор одобрил!</b>\n\n'
                 f'📦 <b>{buyback.task.title}</b>\n'
@@ -69,7 +69,7 @@ def on_response_moderated(sender, instance, **kwargs):
             if next_step.title:
                 text += f'<b>{next_step.title}</b>\n\n'
             text += next_step.instruction
-            text += f'\n\n⏰ <b>Время публикации: {publish_time_str} МСК</b>'
+            text += f'\n\n⏰ <b>Время публикации: {time_display}</b>'
             text += '\n\nЯ напомню тебе когда придёт время.'
             text += '\n\n📸 После публикации отправь скриншот отзыва.'
         else:

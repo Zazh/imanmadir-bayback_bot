@@ -88,6 +88,16 @@
             <label class="form-label">Комментарий (необязательно)</label>
             <textarea name="moderator_comment" class="form-control" rows="2"></textarea>
           </div>
+          {% if has_publish_review %}
+          <div class="mb-3">
+            <label class="form-label">Дата публикации отзыва (необязательно)</label>
+            <div class="d-flex gap-2">
+              <input type="date" name="publish_date" class="form-control">
+              <input type="time" name="publish_time" class="form-control">
+            </div>
+            <small class="text-muted">Если не указано — стандартное время из настроек шага</small>
+          </div>
+          {% endif %}
           <button type="submit" class="btn btn-success w-100">
             <i class="bi bi-check-lg"></i> Одобрить
           </button>

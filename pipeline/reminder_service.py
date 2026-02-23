@@ -27,10 +27,13 @@ def create_reminders_for_step(buyback: Buyback, step) -> list[ReviewReminder]:
     if step.step_type != StepType.PUBLISH_REVIEW:
         return []
 
-    if not step.publish_time:
+    # Кастомная дата имеет приоритет над стандартным временем из шага
+    if buyback.custom_publish_at:
+        publish_dt = buyback.custom_publish_at
+    elif step.publish_time:
+        publish_dt = get_publish_datetime(step.publish_time)
+    else:
         return []
-
-    publish_dt = get_publish_datetime(step.publish_time)
     reminders = []
 
     # За 3 часа
@@ -94,22 +97,35 @@ def cancel_reminders_for_buyback(buyback: Buyback):
     ).update(is_cancelled=True)
 
 
-def get_reminder_text(reminder: ReviewReminder, step) -> str:
+def get_publish_time_display(buyback: Buyback, step) -> str:
+    """Получить отображаемое время публикации (с датой если кастомное)"""
+    if buyback.custom_publish_at:
+        dt_msk = buyback.custom_publish_at.astimezone(MSK)
+        return dt_msk.strftime('%d.%m в %H:%M') + ' МСК'
+    if step.publish_time:
+        return step.publish_time.strftime('%H:%M') + ' МСК'
+    return ''
+
+
+def get_reminder_text(reminder: ReviewReminder, step, buyback: Buyback = None) -> str:
     """Получить текст напоминания"""
-    publish_time = step.publish_time.strftime('%H:%M')
+    if buyback:
+        time_display = get_publish_time_display(buyback, step)
+    else:
+        time_display = step.publish_time.strftime('%H:%M') + ' МСК' if step.publish_time else ''
 
     texts = {
         ReviewReminder.ReminderType.BEFORE_3H: (
             f'⏰ <b>Напоминание</b>\n\n'
-            f'Не забудьте опубликовать отзыв через 3 часа (в {publish_time} МСК).'
+            f'Не забудьте опубликовать отзыв через 3 часа (в {time_display}).'
         ),
         ReviewReminder.ReminderType.BEFORE_2H: (
             f'⏰ <b>Напоминание</b>\n\n'
-            f'Не забудьте опубликовать отзыв через 2 часа (в {publish_time} МСК).'
+            f'Не забудьте опубликовать отзыв через 2 часа (в {time_display}).'
         ),
         ReviewReminder.ReminderType.BEFORE_1H: (
             f'⏰ <b>Напоминание</b>\n\n'
-            f'Скоро надо будет опубликовать отзыв (в {publish_time} МСК).'
+            f'Скоро надо будет опубликовать отзыв (в {time_display}).'
         ),
         ReviewReminder.ReminderType.BEFORE_5M: (
             f'⏰ <b>Напоминание</b>\n\n'

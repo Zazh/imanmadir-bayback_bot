@@ -8,6 +8,7 @@ from pipeline.reminder_service import (
     create_reminders_for_step,
     cancel_reminders_for_buyback,
     get_reminder_text,
+    get_publish_time_display,
 )
 from steps.models import StepType
 
@@ -51,7 +52,7 @@ async def check_reminders_job(context: ContextTypes.DEFAULT_TYPE):
 
         # Отправляем
         chat_id = buyback.user.telegram_id
-        text = get_reminder_text(reminder, reminder.step)
+        text = get_reminder_text(reminder, reminder.step, buyback)
 
         try:
             await context.bot.send_message(
@@ -88,7 +89,7 @@ async def schedule_publish_review_reminders(application, buyback: Buyback, step)
     if step.step_type != StepType.PUBLISH_REVIEW:
         return
 
-    if not step.publish_time:
+    if not buyback.custom_publish_at and not step.publish_time:
         return
 
     # Создаём напоминания в БД
@@ -97,12 +98,12 @@ async def schedule_publish_review_reminders(application, buyback: Buyback, step)
 
     # Отправляем первое сообщение
     chat_id = buyback.user.telegram_id
-    publish_time_str = step.publish_time.strftime('%H:%M')
+    time_display = get_publish_time_display(buyback, step)
 
     text = (
         f'📝 <b>Публикация отзыва</b>\n\n'
         f'{step.instruction}\n\n'
-        f'⏰ <b>Время публикации: {publish_time_str} МСК</b>\n\n'
+        f'⏰ <b>Время публикации: {time_display}</b>\n\n'
         f'Я напомню тебе когда придёт время.\n\n'
         f'📸 После публикации отправь скриншот отзыва.'
     )

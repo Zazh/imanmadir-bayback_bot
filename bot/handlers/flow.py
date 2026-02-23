@@ -115,7 +115,7 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, buyback:
     await buyback.asave(update_fields=['step_started_at', 'reminder_sent'])
 
     # Для шага публикации отзыва — запускаем систему напоминаний
-    if step.step_type == StepType.PUBLISH_REVIEW and step.publish_time:
+    if step.step_type == StepType.PUBLISH_REVIEW and (buyback.custom_publish_at or step.publish_time):
         # Загружаем user для напоминаний
         buyback_with_user = await Buyback.objects.select_related('user').aget(id=buyback.id)
         await schedule_publish_review_reminders(context.application, buyback_with_user, step)

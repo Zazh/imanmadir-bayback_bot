@@ -150,6 +150,14 @@ class ModerationForm(forms.Form):
             'placeholder': 'Комментарий модератора...',
         }),
     )
+    publish_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+    )
+    publish_time = forms.TimeField(
+        required=False,
+        widget=forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+    )
 
 
 class PayoutActionForm(forms.Form):
