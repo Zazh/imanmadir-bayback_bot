@@ -1,3 +1,6 @@
+import requests as http_requests
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -8,6 +11,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 
 from account.models import TelegramUser
+from bonus.models import BonusMessage
 from catalog.models import Product, Task
 from payouts.models import Payout
 from pipeline.models import Buyback, BuybackResponse
@@ -393,7 +397,17 @@ class PayoutListView(StaffRequiredMixin, View):
 
 class UserListView(StaffRequiredMixin, View):
     def get(self, request):
-        qs = TelegramUser.objects.all()
+        qs = TelegramUser.objects.annotate(
+            buyback_count=Count('buybacks'),
+            bonus_msg_count=Count('bonus_messages'),
+            unread_bonus=Count(
+                'bonus_messages',
+                filter=Q(
+                    bonus_messages__sender_type=BonusMessage.SenderType.USER,
+                    bonus_messages__is_read=False,
+                ),
+            ),
+        )
         q = request.GET.get('q', '')
         if q:
             qs = qs.filter(
@@ -403,17 +417,35 @@ class UserListView(StaffRequiredMixin, View):
                 Q(phone__icontains=q) |
                 Q(telegram_id__icontains=q)
             )
+        source = request.GET.get('source', '')
+        if source == 'bayback':
+            qs = qs.filter(buyback_count__gt=0)
+        elif source == 'bonus':
+            qs = qs.filter(bonus_msg_count__gt=0)
         paginator = Paginator(qs, 20)
         page = paginator.get_page(request.GET.get('page'))
-        return render(request, 'backoffice/users/list.html', {'page': page, 'q': q})
+        return render(request, 'backoffice/users/list.html', {
+            'page': page, 'q': q, 'source': source,
+        })
 
 
 class UserDetailView(StaffRequiredMixin, View):
     def get(self, request, pk):
         user = get_object_or_404(TelegramUser, pk=pk)
         buybacks = user.buybacks.select_related('task', 'task__product').order_by('-started_at')[:20]
+        chat_messages = user.bonus_messages.all().order_by('created_at')
+
+        user.bonus_messages.filter(
+            sender_type=BonusMessage.SenderType.USER,
+            is_read=False,
+        ).update(is_read=True)
+
+        last_msg = chat_messages.last()
         return render(request, 'backoffice/users/detail.html', {
-            'tg_user': user, 'buybacks': buybacks,
+            'tg_user': user,
+            'buybacks': buybacks,
+            'chat_messages': chat_messages,
+            'last_message_id': last_msg.id if last_msg else 0,
         })
 
 
@@ -493,3 +525,155 @@ class StepTemplateDataView(StaffRequiredMixin, View):
             ],
         }
         return JsonResponse(data)
+
+
+# ─── Bonus Bot ──────────────────────────────────────────────────────────────
+
+class BonusUserListView(StaffRequiredMixin, View):
+    def get(self, request):
+        qs = TelegramUser.objects.filter(bonus_bot_user=True).annotate(
+            bonus_msg_count=Count('bonus_messages'),
+            unread_bonus=Count(
+                'bonus_messages',
+                filter=Q(
+                    bonus_messages__sender_type=BonusMessage.SenderType.USER,
+                    bonus_messages__is_read=False,
+                ),
+            ),
+        )
+        q = request.GET.get('q', '')
+        if q:
+            qs = qs.filter(
+                Q(username__icontains=q) |
+                Q(first_name__icontains=q) |
+                Q(last_name__icontains=q) |
+                Q(telegram_id__icontains=q)
+            )
+        paginator = Paginator(qs, 20)
+        page = paginator.get_page(request.GET.get('page'))
+        return render(request, 'backoffice/bonus/user_list.html', {
+            'page': page, 'q': q,
+        })
+
+
+class BonusChatView(StaffRequiredMixin, View):
+    def get(self, request, pk):
+        user = get_object_or_404(TelegramUser, pk=pk)
+        chat_messages = user.bonus_messages.all().order_by('created_at')
+
+        user.bonus_messages.filter(
+            sender_type=BonusMessage.SenderType.USER,
+            is_read=False,
+        ).update(is_read=True)
+
+        last_msg = chat_messages.last()
+        return render(request, 'backoffice/bonus/chat.html', {
+            'bonus_user': user,
+            'chat_messages': chat_messages,
+            'last_message_id': last_msg.id if last_msg else 0,
+        })
+
+    def post(self, request, pk):
+        user = get_object_or_404(TelegramUser, pk=pk)
+        text = request.POST.get('message', '').strip()
+        if not text:
+            messages.error(request, 'Сообщение не может быть пустым')
+            return redirect('backoffice:bonus_chat', pk=pk)
+
+        telegram_message_id = None
+        try:
+            resp = http_requests.post(
+                f'https://api.telegram.org/bot{settings.BONUS_BOT_TOKEN}/sendMessage',
+                json={
+                    'chat_id': user.telegram_id,
+                    'text': text,
+                },
+                timeout=10,
+            )
+            data = resp.json()
+            if data.get('ok'):
+                telegram_message_id = data['result']['message_id']
+            else:
+                messages.warning(
+                    request,
+                    f'Telegram API: {data.get("description", "Unknown error")}'
+                )
+        except http_requests.RequestException as e:
+            messages.warning(request, f'Ошибка отправки: {e}')
+
+        BonusMessage.objects.create(
+            user=user,
+            sender_type=BonusMessage.SenderType.MANAGER,
+            text=text,
+            is_read=True,
+            telegram_message_id=telegram_message_id,
+        )
+
+        return redirect('backoffice:bonus_chat', pk=pk)
+
+
+class BonusChatSendView(StaffRequiredMixin, View):
+    def post(self, request, pk):
+        user = get_object_or_404(TelegramUser, pk=pk)
+        text = request.POST.get('message', '').strip()
+        if not text:
+            messages.error(request, 'Сообщение не может быть пустым')
+            return redirect('backoffice:user_detail', pk=pk)
+
+        telegram_message_id = None
+        try:
+            resp = http_requests.post(
+                f'https://api.telegram.org/bot{settings.BONUS_BOT_TOKEN}/sendMessage',
+                json={
+                    'chat_id': user.telegram_id,
+                    'text': text,
+                },
+                timeout=10,
+            )
+            data = resp.json()
+            if data.get('ok'):
+                telegram_message_id = data['result']['message_id']
+            else:
+                messages.warning(
+                    request,
+                    f'Telegram API: {data.get("description", "Unknown error")}'
+                )
+        except http_requests.RequestException as e:
+            messages.warning(request, f'Ошибка отправки: {e}')
+
+        BonusMessage.objects.create(
+            user=user,
+            sender_type=BonusMessage.SenderType.MANAGER,
+            text=text,
+            is_read=True,
+            telegram_message_id=telegram_message_id,
+        )
+
+        return redirect('backoffice:user_detail', pk=pk)
+
+
+class BonusChatMessagesAPI(StaffRequiredMixin, View):
+    def get(self, request, pk):
+        user = get_object_or_404(TelegramUser, pk=pk)
+        try:
+            after_id = int(request.GET.get('after', 0))
+        except (ValueError, TypeError):
+            after_id = 0
+
+        new_messages = user.bonus_messages.filter(id__gt=after_id).order_by('created_at')
+
+        new_messages.filter(
+            sender_type=BonusMessage.SenderType.USER,
+            is_read=False,
+        ).update(is_read=True)
+
+        data = [
+            {
+                'id': m.id,
+                'sender_type': m.sender_type,
+                'text': m.text,
+                'created_at': m.created_at.strftime('%H:%M'),
+            }
+            for m in new_messages
+        ]
+        return JsonResponse({'messages': data})

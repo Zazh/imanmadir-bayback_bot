@@ -43,4 +43,10 @@ urlpatterns = [
     # Users
     path('users/', views.UserListView.as_view(), name='user_list'),
     path('users/<int:pk>/', views.UserDetailView.as_view(), name='user_detail'),
+    path('users/<int:pk>/chat/send/', views.BonusChatSendView.as_view(), name='bonus_chat_send'),
+    path('users/api/messages/<int:pk>/', views.BonusChatMessagesAPI.as_view(), name='bonus_chat_messages_api'),
+
+    # Bonus Bot
+    path('bonus/', views.BonusUserListView.as_view(), name='bonus_user_list'),
+    path('bonus/<int:pk>/chat/', views.BonusChatView.as_view(), name='bonus_chat'),
 ]

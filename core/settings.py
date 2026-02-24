@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'pipeline',
     'payouts',
     'bot',
+    'bonus',
     'backoffice',
 ]
 
@@ -92,6 +93,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Telegram Bot
 BOT_TOKEN = config('BOT_TOKEN')
+BONUS_BOT_TOKEN = config('BONUS_BOT_TOKEN', default='')
 MANAGER_USERNAME = config('MANAGER_USERNAME', default='manager')
 DOCUMENTS_URL = config('DOCUMENTS_URL', default='https://drive.google.com/drive/folders/135ZcME2o1n4i--OXHn4-3FHM3BfRhN-Z')
 

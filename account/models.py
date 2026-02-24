@@ -24,6 +24,12 @@ class TelegramUser(models.Model):
         max_length=255,
         blank=True,
     )
+    language_code = models.CharField(
+        'Язык',
+        max_length=10,
+        blank=True,
+        default='',
+    )
 
     # Реквизиты для выплат
     phone = models.CharField(
@@ -55,6 +61,11 @@ class TelegramUser(models.Model):
         null=True,
         blank=True,
         help_text='Ответ на вопрос об исключении отзывов',
+    )
+
+    bonus_bot_user = models.BooleanField(
+        'Пользователь бонус-бота',
+        default=False,
     )
 
     is_active = models.BooleanField(

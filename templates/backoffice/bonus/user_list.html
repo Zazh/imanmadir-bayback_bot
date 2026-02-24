@@ -1,0 +1,63 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Бонус-бот — BayBack{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">Бонус-бот</h4>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <form method="get" class="d-flex gap-2">
+      <input type="text" name="q" class="form-control form-control-sm" style="max-width: 300px;"
+             placeholder="Поиск по имени, username, ID..." value="{{ q }}">
+      <button class="btn btn-sm btn-outline-primary">Найти</button>
+      {% if q %}<a href="{% url 'backoffice:bonus_user_list' %}" class="btn btn-sm btn-outline-secondary">Сбросить</a>{% endif %}
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Пользователь</th>
+          <th>Telegram ID</th>
+          <th>Сообщений</th>
+          <th>Непрочитанных</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in page %}
+        <tr>
+          <td>
+            {{ u.first_name }} {{ u.last_name }}
+            {% if u.username %}<span class="text-muted">@{{ u.username }}</span>{% endif %}
+          </td>
+          <td><code>{{ u.telegram_id }}</code></td>
+          <td>{{ u.bonus_msg_count }}</td>
+          <td>
+            {% if u.unread_bonus %}
+            <span class="badge bg-danger">{{ u.unread_bonus }}</span>
+            {% else %}
+            <span class="text-muted">0</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'backoffice:bonus_chat' u.pk %}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-chat-dots"></i> Чат
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-4">Нет пользователей</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+{% include "backoffice/_pagination.html" %}
+{% endif %}
+{% endblock %}

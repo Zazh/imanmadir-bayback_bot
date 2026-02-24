@@ -34,3 +34,10 @@ def status_badge(status):
         'failed': 'danger',
     }
     return mapping.get(status, 'secondary')
+
+
+@register.filter
+def dict_get(d, key):
+    if isinstance(d, dict):
+        return d.get(key)
+    return None

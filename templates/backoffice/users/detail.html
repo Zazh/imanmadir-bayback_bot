@@ -21,6 +21,7 @@
         <div><strong>ID:</strong> <code>{{ tg_user.telegram_id }}</code></div>
         {% if tg_user.username %}<div><strong>Username:</strong> @{{ tg_user.username }}</div>{% endif %}
         <div><strong>Имя:</strong> {{ tg_user.first_name }} {{ tg_user.last_name }}</div>
+        {% if tg_user.language_code %}<div><strong>Язык:</strong> {{ tg_user.language_code }}</div>{% endif %}
       </div>
     </div>
   </div>
@@ -60,7 +61,8 @@
   </div>
 </div>
 
-<div class="card border-0 shadow-sm">
+{% if buybacks %}
+<div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white">
     <h6 class="mb-0">История выкупов</h6>
   </div>
@@ -86,11 +88,85 @@
           <td>{{ b.started_at|date:"d.m.Y H:i" }}</td>
           <td><a href="{% url 'backoffice:buyback_detail' b.pk %}" class="btn btn-sm btn-outline-primary">Открыть</a></td>
         </tr>
-        {% empty %}
-        <tr><td colspan="6" class="text-muted text-center py-3">Нет выкупов</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+{% endif %}
+
+{% if chat_messages.exists or True %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <h6 class="mb-0"><i class="bi bi-gift me-1"></i> Переписка бонус-бота</h6>
+  </div>
+  <div class="card-body" id="chat-messages"
+       style="height: 400px; overflow-y: auto; background: #f8f9fa;">
+    {% for msg in chat_messages %}
+    <div class="mb-2 d-flex {% if msg.sender_type == 'manager' %}justify-content-end{% endif %}">
+      <div class="px-3 py-2 rounded-3 {% if msg.sender_type == 'manager' %}bg-primary text-white{% else %}bg-white border{% endif %}"
+           style="max-width: 70%;">
+        <div style="white-space: pre-wrap;">{{ msg.text }}</div>
+        <div class="{% if msg.sender_type == 'manager' %}text-white-50{% else %}text-muted{% endif %} small text-end">
+          {{ msg.created_at|date:"d.m H:i" }}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-4">Нет сообщений</div>
+    {% endfor %}
+  </div>
+  <div class="card-footer bg-white">
+    <form method="post" action="{% url 'backoffice:bonus_chat_send' tg_user.pk %}" class="d-flex gap-2">
+      {% csrf_token %}
+      <input type="text" name="message" class="form-control"
+             placeholder="Написать в бонус-бот..." autocomplete="off" required>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-send"></i>
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const chatBox = document.getElementById('chat-messages');
+    if (!chatBox) return;
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    let lastMessageId = {{ last_message_id|default:"0" }};
+
+    setInterval(async () => {
+        try {
+            const resp = await fetch(
+                '{% url "backoffice:bonus_chat_messages_api" tg_user.pk %}?after=' + lastMessageId
+            );
+            const data = await resp.json();
+            if (data.messages && data.messages.length > 0) {
+                const emptyMsg = chatBox.querySelector('.text-center.text-muted');
+                if (emptyMsg) emptyMsg.remove();
+
+                data.messages.forEach(msg => {
+                    const isManager = msg.sender_type === 'manager';
+                    const div = document.createElement('div');
+                    div.className = 'mb-2 d-flex ' + (isManager ? 'justify-content-end' : '');
+                    div.innerHTML =
+                        '<div class="px-3 py-2 rounded-3 ' +
+                        (isManager ? 'bg-primary text-white' : 'bg-white border') +
+                        '" style="max-width: 70%;">' +
+                        '<div style="white-space: pre-wrap;">' + msg.text.replace(/</g, '&lt;') + '</div>' +
+                        '<div class="' + (isManager ? 'text-white-50' : 'text-muted') +
+                        ' small text-end">' + msg.created_at + '</div></div>';
+                    chatBox.appendChild(div);
+                    lastMessageId = msg.id;
+                });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        } catch (e) {}
+    }, 10000);
+})();
+</script>
 {% endblock %}

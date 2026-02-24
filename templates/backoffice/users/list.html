@@ -1,4 +1,5 @@
 {% extends "backoffice/base.html" %}
+{% load backoffice_tags %}
 
 {% block title %}Пользователи — BayBack{% endblock %}
 
@@ -9,7 +10,14 @@
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-center">
       <div class="col-auto">
-        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Имя, username, телефон...">
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Имя, username, телефон, ID...">
+      </div>
+      <div class="col-auto">
+        <select name="source" class="form-select form-select-sm">
+          <option value="">Все источники</option>
+          <option value="bayback" {% if source == 'bayback' %}selected{% endif %}>BayBack</option>
+          <option value="bonus" {% if source == 'bonus' %}selected{% endif %}>Бонус-бот</option>
+        </select>
       </div>
       <div class="col-auto">
         <button class="btn btn-sm btn-outline-secondary">Поиск</button>
@@ -25,7 +33,7 @@
         <tr>
           <th>Пользователь</th>
           <th>Telegram ID</th>
-          <th>Реквизиты</th>
+          <th>Источник</th>
           <th>Выкупов</th>
           <th>Статус</th>
           <th>Регистрация</th>
@@ -41,12 +49,9 @@
           </td>
           <td><code>{{ u.telegram_id }}</code></td>
           <td>
-            {% if u.has_payment_info %}
-            <span class="text-success"><i class="bi bi-check-circle"></i></span>
-            {{ u.bank_name }}
-            {% else %}
-            <span class="text-muted">Не заполнены</span>
-            {% endif %}
+            {% if u.buyback_count %}<span class="badge bg-primary me-1">BayBack</span>{% endif %}
+            {% if u.bonus_msg_count %}<span class="badge bg-info">Bonus</span>{% endif %}
+            {% if not u.buyback_count and not u.bonus_msg_count %}<span class="badge bg-secondary">Новый</span>{% endif %}
           </td>
           <td>{{ u.total_completed }}</td>
           <td>
@@ -60,7 +65,10 @@
           </td>
           <td>{{ u.created_at|date:"d.m.Y" }}</td>
           <td>
-            <a href="{% url 'backoffice:user_detail' u.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+            <a href="{% url 'backoffice:user_detail' u.pk %}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-eye"></i>
+              {% if u.unread_bonus %}<span class="badge bg-danger ms-1">{{ u.unread_bonus }}</span>{% endif %}
+            </a>
           </td>
         </tr>
         {% empty %}

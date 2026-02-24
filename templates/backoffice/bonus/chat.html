@@ -1,0 +1,99 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Чат с {{ bonus_user }} — BayBack{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'backoffice:bonus_user_list' %}">Бонус-бот</a></li>
+    <li class="breadcrumb-item active">{{ bonus_user }}</li>
+  </ol>
+</nav>
+
+<div class="row mb-3">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Пользователь</h6>
+        <div><strong>ID:</strong> <code>{{ bonus_user.telegram_id }}</code></div>
+        {% if bonus_user.username %}<div><strong>Username:</strong> @{{ bonus_user.username }}</div>{% endif %}
+        <div><strong>Имя:</strong> {{ bonus_user.first_name }} {{ bonus_user.last_name }}</div>
+        {% if bonus_user.language_code %}<div><strong>Язык:</strong> {{ bonus_user.language_code }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white">
+    <h6 class="mb-0"><i class="bi bi-chat-dots me-1"></i> Переписка</h6>
+  </div>
+  <div class="card-body" id="chat-messages"
+       style="height: 500px; overflow-y: auto; background: #f8f9fa;">
+    {% for msg in chat_messages %}
+    <div class="mb-2 d-flex {% if msg.sender_type == 'manager' %}justify-content-end{% endif %}">
+      <div class="px-3 py-2 rounded-3 {% if msg.sender_type == 'manager' %}bg-primary text-white{% else %}bg-white border{% endif %}"
+           style="max-width: 70%;">
+        <div style="white-space: pre-wrap;">{{ msg.text }}</div>
+        <div class="{% if msg.sender_type == 'manager' %}text-white-50{% else %}text-muted{% endif %} small text-end">
+          {{ msg.created_at|date:"d.m H:i" }}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-4">Нет сообщений</div>
+    {% endfor %}
+  </div>
+  <div class="card-footer bg-white">
+    <form method="post" class="d-flex gap-2">
+      {% csrf_token %}
+      <input type="text" name="message" class="form-control"
+             placeholder="Написать сообщение..." autocomplete="off" required>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-send"></i>
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const chatBox = document.getElementById('chat-messages');
+    if (!chatBox) return;
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    let lastMessageId = {{ last_message_id|default:"0" }};
+
+    setInterval(async () => {
+        try {
+            const resp = await fetch(
+                '{% url "backoffice:bonus_chat_messages_api" bonus_user.pk %}?after=' + lastMessageId
+            );
+            const data = await resp.json();
+            if (data.messages && data.messages.length > 0) {
+                const emptyMsg = chatBox.querySelector('.text-center.text-muted');
+                if (emptyMsg) emptyMsg.remove();
+
+                data.messages.forEach(msg => {
+                    const isManager = msg.sender_type === 'manager';
+                    const div = document.createElement('div');
+                    div.className = 'mb-2 d-flex ' + (isManager ? 'justify-content-end' : '');
+                    div.innerHTML =
+                        '<div class="px-3 py-2 rounded-3 ' +
+                        (isManager ? 'bg-primary text-white' : 'bg-white border') +
+                        '" style="max-width: 70%;">' +
+                        '<div style="white-space: pre-wrap;">' + msg.text.replace(/</g, '&lt;') + '</div>' +
+                        '<div class="' + (isManager ? 'text-white-50' : 'text-muted') +
+                        ' small text-end">' + msg.created_at + '</div></div>';
+                    chatBox.appendChild(div);
+                    lastMessageId = msg.id;
+                });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        } catch (e) {}
+    }, 5000);
+})();
+</script>
+{% endblock %}
