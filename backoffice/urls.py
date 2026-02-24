@@ -21,6 +21,12 @@ urlpatterns = [
     path('tasks/create/', views.TaskCreateView.as_view(), name='task_create'),
     path('tasks/<int:pk>/', views.TaskDetailView.as_view(), name='task_detail'),
     path('tasks/<int:pk>/edit/', views.TaskEditView.as_view(), name='task_edit'),
+    path('tasks/<int:pk>/save-template/', views.SaveStepsAsTemplateView.as_view(), name='save_steps_as_template'),
+
+    # Step Templates
+    path('step-templates/', views.StepTemplateListView.as_view(), name='step_template_list'),
+    path('step-templates/<int:pk>/delete/', views.StepTemplateDeleteView.as_view(), name='step_template_delete'),
+    path('step-templates/<int:pk>/data/', views.StepTemplateDataView.as_view(), name='step_template_data'),
 
     # Buybacks
     path('buybacks/', views.BuybackListView.as_view(), name='buyback_list'),

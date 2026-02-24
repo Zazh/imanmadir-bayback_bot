@@ -1,0 +1,42 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Шаблоны шагов — BayBack{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">Шаблоны шагов</h4>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Название</th>
+          <th>Кол-во шагов</th>
+          <th>Создан</th>
+          <th style="width: 100px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tpl in templates %}
+        <tr>
+          <td>{{ tpl.name }}</td>
+          <td><span class="badge bg-light text-dark">{{ tpl.steps_count }}</span></td>
+          <td>{{ tpl.created_at|date:"d.m.Y H:i" }}</td>
+          <td>
+            <form method="post" action="{% url 'backoffice:step_template_delete' tpl.pk %}"
+                  onsubmit="return confirm('Удалить шаблон «{{ tpl.name }}»?')">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted text-center py-3">Нет шаблонов. Сохраните шаги из любого задания.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

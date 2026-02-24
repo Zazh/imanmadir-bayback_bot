@@ -39,8 +39,13 @@
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link {% if 'task' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'backoffice:task_list' %}">
+        <a class="nav-link {% if 'task' in request.resolver_match.url_name and 'step_template' not in request.resolver_match.url_name %}active{% endif %}" href="{% url 'backoffice:task_list' %}">
           <i class="bi bi-list-task"></i> Задания
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if 'step_template' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'backoffice:step_template_list' %}">
+          <i class="bi bi-clipboard-data"></i> Шаблоны шагов
         </a>
       </li>
       <li class="nav-item">

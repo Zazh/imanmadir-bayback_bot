@@ -94,3 +94,90 @@ class TaskStep(models.Model):
 
     def __str__(self):
         return f'{self.task.title} — Шаг {self.order}'
+
+
+class StepTemplate(models.Model):
+    """Шаблон шагов задания"""
+
+    name = models.CharField(
+        'Название шаблона',
+        max_length=255,
+        unique=True,
+    )
+    created_at = models.DateTimeField(
+        'Дата создания',
+        auto_now_add=True,
+    )
+
+    class Meta:
+        verbose_name = 'Шаблон шагов'
+        verbose_name_plural = 'Шаблоны шагов'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+
+class StepTemplateItem(models.Model):
+    """Шаг внутри шаблона"""
+
+    template = models.ForeignKey(
+        StepTemplate,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name='Шаблон',
+    )
+    order = models.PositiveIntegerField('Порядок')
+    title = models.CharField(
+        'Заголовок',
+        max_length=255,
+        blank=True,
+    )
+    step_type = models.CharField(
+        'Тип шага',
+        max_length=20,
+        choices=StepType.choices,
+    )
+    instruction = models.TextField('Инструкция')
+    image = models.ImageField(
+        'Изображение',
+        upload_to='step_templates/',
+        blank=True,
+    )
+    settings = models.JSONField(
+        'Настройки',
+        default=dict,
+        blank=True,
+    )
+    publish_time = models.TimeField(
+        'Время публикации (МСК)',
+        null=True,
+        blank=True,
+    )
+    timeout_minutes = models.PositiveIntegerField(
+        'Таймаут (минут)',
+        null=True,
+        blank=True,
+    )
+    reminder_minutes = models.PositiveIntegerField(
+        'Напоминание через (минут)',
+        null=True,
+        blank=True,
+    )
+    reminder_text = models.TextField(
+        'Текст напоминания',
+        blank=True,
+    )
+    requires_moderation = models.BooleanField(
+        'Требует модерации',
+        default=False,
+    )
+
+    class Meta:
+        verbose_name = 'Шаг шаблона'
+        verbose_name_plural = 'Шаги шаблона'
+        ordering = ['template', 'order']
+        unique_together = ['template', 'order']
+
+    def __str__(self):
+        return f'{self.template.name} — Шаг {self.order}'

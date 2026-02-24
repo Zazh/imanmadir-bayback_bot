@@ -1,7 +1,9 @@
+from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 
@@ -9,7 +11,7 @@ from account.models import TelegramUser
 from catalog.models import Product, Task
 from payouts.models import Payout
 from pipeline.models import Buyback, BuybackResponse
-from steps.models import TaskStep, StepType
+from steps.models import TaskStep, StepType, StepTemplate, StepTemplateItem
 
 from .forms import (
     ProductForm, TaskForm, TaskStepFormSet,
@@ -132,11 +134,15 @@ class TaskListView(StaffRequiredMixin, View):
 
 
 class TaskCreateView(StaffRequiredMixin, View):
+    def _get_step_templates(self):
+        return StepTemplate.objects.annotate(steps_count=Count('items')).all()
+
     def get(self, request):
         form = TaskForm()
         formset = TaskStepFormSet()
         return render(request, 'backoffice/tasks/form.html', {
             'form': form, 'formset': formset,
+            'step_templates': self._get_step_templates(),
         })
 
     def post(self, request):
@@ -152,16 +158,21 @@ class TaskCreateView(StaffRequiredMixin, View):
             formset = TaskStepFormSet(request.POST, request.FILES)
         return render(request, 'backoffice/tasks/form.html', {
             'form': form, 'formset': formset,
+            'step_templates': self._get_step_templates(),
         })
 
 
 class TaskEditView(StaffRequiredMixin, View):
+    def _get_step_templates(self):
+        return StepTemplate.objects.annotate(steps_count=Count('items')).all()
+
     def get(self, request, pk):
         task = get_object_or_404(Task, pk=pk)
         form = TaskForm(instance=task)
         formset = TaskStepFormSet(instance=task)
         return render(request, 'backoffice/tasks/form.html', {
             'form': form, 'formset': formset, 'task': task,
+            'step_templates': self._get_step_templates(),
         })
 
     def post(self, request, pk):
@@ -174,6 +185,7 @@ class TaskEditView(StaffRequiredMixin, View):
             return redirect('backoffice:task_detail', pk=task.pk)
         return render(request, 'backoffice/tasks/form.html', {
             'form': form, 'formset': formset, 'task': task,
+            'step_templates': self._get_step_templates(),
         })
 
 
@@ -403,3 +415,81 @@ class UserDetailView(StaffRequiredMixin, View):
         return render(request, 'backoffice/users/detail.html', {
             'tg_user': user, 'buybacks': buybacks,
         })
+
+
+# ─── Step Templates ──────────────────────────────────────────────────────────
+
+class SaveStepsAsTemplateView(StaffRequiredMixin, View):
+    def post(self, request, pk):
+        task = get_object_or_404(Task, pk=pk)
+        name = request.POST.get('template_name', '').strip()
+        if not name:
+            messages.error(request, 'Укажите название шаблона')
+            return redirect('backoffice:task_detail', pk=pk)
+        if StepTemplate.objects.filter(name=name).exists():
+            messages.error(request, f'Шаблон «{name}» уже существует')
+            return redirect('backoffice:task_detail', pk=pk)
+
+        template = StepTemplate.objects.create(name=name)
+        steps = task.steps.all().order_by('order')
+        for step in steps:
+            StepTemplateItem.objects.create(
+                template=template,
+                order=step.order,
+                title=step.title,
+                step_type=step.step_type,
+                instruction=step.instruction,
+                image=step.image.name if step.image else '',
+                settings=step.settings,
+                publish_time=step.publish_time,
+                timeout_minutes=step.timeout_minutes,
+                reminder_minutes=step.reminder_minutes,
+                reminder_text=step.reminder_text,
+                requires_moderation=step.requires_moderation,
+            )
+        messages.success(request, f'Шаблон «{name}» сохранён ({steps.count()} шагов)')
+        return redirect('backoffice:task_detail', pk=pk)
+
+
+class StepTemplateListView(StaffRequiredMixin, View):
+    def get(self, request):
+        qs = StepTemplate.objects.annotate(steps_count=Count('items')).all()
+        return render(request, 'backoffice/step_templates/list.html', {
+            'templates': qs,
+        })
+
+
+class StepTemplateDeleteView(StaffRequiredMixin, View):
+    def post(self, request, pk):
+        template = get_object_or_404(StepTemplate, pk=pk)
+        name = template.name
+        template.delete()
+        messages.success(request, f'Шаблон «{name}» удалён')
+        return redirect('backoffice:step_template_list')
+
+
+class StepTemplateDataView(StaffRequiredMixin, View):
+    def get(self, request, pk):
+        template = get_object_or_404(StepTemplate, pk=pk)
+        items = template.items.order_by('order')
+        data = {
+            'name': template.name,
+            'steps': [
+                {
+                    'order': item.order,
+                    'title': item.title,
+                    'step_type': item.step_type,
+                    'instruction': item.instruction,
+                    'publish_time': item.publish_time.strftime('%H:%M') if item.publish_time else '',
+                    'timeout_minutes': item.timeout_minutes or '',
+                    'reminder_minutes': item.reminder_minutes or '',
+                    'reminder_text': item.reminder_text,
+                    'requires_moderation': item.requires_moderation,
+                    'correct_article': item.settings.get('correct_article', ''),
+                    'min_length': item.settings.get('min_length', ''),
+                    'choices_text': '\n'.join(item.settings.get('choices', [])),
+                }
+                for item in items
+            ],
+        }
+        return JsonResponse(data)

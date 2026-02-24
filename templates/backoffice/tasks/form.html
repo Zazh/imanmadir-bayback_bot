@@ -38,8 +38,23 @@
   </div>
 
   <div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-      <h6 class="mb-0">Шаги задания</h6>
+    <div class="card-header bg-white">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Шаги задания</h6>
+        {% if step_templates %}
+        <div class="d-flex align-items-center gap-2">
+          <select id="template-selector" class="form-select form-select-sm" style="width: 250px">
+            <option value="">-- Загрузить из шаблона --</option>
+            {% for tpl in step_templates %}
+            <option value="{{ tpl.pk }}">{{ tpl.name }} ({{ tpl.steps_count }} шаг.)</option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="load-template-btn" disabled>
+            <i class="bi bi-download"></i> Загрузить
+          </button>
+        </div>
+        {% endif %}
+      </div>
     </div>
     <div class="card-body">
       {{ formset.management_form }}
@@ -110,6 +125,7 @@
     <a href="{% url 'backoffice:task_list' %}" class="btn btn-outline-secondary">Отмена</a>
   </div>
 </form>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -157,18 +173,39 @@ function toggleConditionalFields(stepForm) {
 document.querySelectorAll('.step-form').forEach(toggleConditionalFields);
 updateOrder();
 
-// --- On submit: set order for filled forms, clear for empty ---
+// --- On submit: remove empty new steps, re-index remaining ---
 document.querySelector('form').addEventListener('submit', function() {
-    document.querySelectorAll('#steps-container .step-form').forEach(function(form, i) {
+    var container = document.getElementById('steps-container');
+    var totalForms = document.getElementById('id_steps-TOTAL_FORMS');
+    var forms = Array.from(container.querySelectorAll('.step-form'));
+
+    // Remove empty new (unsaved) step forms
+    forms.forEach(function(form) {
+        var idField = form.querySelector('[name$="-id"]');
         var typeSelect = form.querySelector('[name$="-step_type"]');
-        var orderField = form.querySelector('[name$="-order"]');
-        if (!orderField) return;
-        if (typeSelect && typeSelect.value) {
-            orderField.value = i + 1;
-        } else {
-            orderField.value = '';
+        var isNew = !idField || !idField.value;
+        var isEmpty = !typeSelect || !typeSelect.value;
+        if (isNew && isEmpty) {
+            form.remove();
         }
     });
+
+    // Re-index remaining forms sequentially
+    var remaining = container.querySelectorAll('.step-form');
+    remaining.forEach(function(form, i) {
+        form.querySelectorAll('input, select, textarea').forEach(function(input) {
+            if (input.name) input.name = input.name.replace(/-\d+-/, '-' + i + '-');
+            if (input.id) input.id = input.id.replace(/-\d+-/, '-' + i + '-');
+        });
+        form.querySelectorAll('label').forEach(function(label) {
+            var f = label.getAttribute('for');
+            if (f) label.setAttribute('for', f.replace(/-\d+-/, '-' + i + '-'));
+        });
+        var orderField = form.querySelector('[name$="-order"]');
+        if (orderField) orderField.value = i + 1;
+    });
+
+    totalForms.value = remaining.length;
 });
 
 // --- Add new step ---
@@ -188,7 +225,9 @@ document.getElementById('add-step').addEventListener('click', function() {
         var id = input.id.replace(/-\d+-/, '-' + formCount + '-');
         input.name = name;
         input.id = id;
-        if (input.type === 'checkbox') {
+        if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+        } else if (input.type === 'checkbox') {
             input.checked = false;
         } else if (input.type !== 'hidden') {
             input.value = '';
@@ -217,5 +256,145 @@ document.getElementById('add-step').addEventListener('click', function() {
     updateOrder();
     toggleConditionalFields(newForm);
 });
+
+// ──── Template Loading ────────────────────────────────────────────────
+(function() {
+    var templateSelector = document.getElementById('template-selector');
+    var loadBtn = document.getElementById('load-template-btn');
+    if (!templateSelector || !loadBtn) return;
+
+    // Сохраняем первую форму как «эталон» для клонирования
+    var firstForm = document.querySelector('#steps-container .step-form');
+    var templateFormHTML = firstForm ? firstForm.outerHTML : null;
+
+    templateSelector.addEventListener('change', function() {
+        loadBtn.disabled = !this.value;
+    });
+
+    // При клике — сразу загружаем шаблон и заменяем шаги
+    loadBtn.addEventListener('click', function() {
+        var templateId = templateSelector.value;
+        if (!templateId) return;
+        loadBtn.disabled = true;
+        loadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Загрузка...';
+
+        fetch('/backoffice/step-templates/' + templateId + '/data/')
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            clearAllSteps();
+            populateSteps(data.steps);
+            templateSelector.value = '';
+            loadBtn.innerHTML = '<i class="bi bi-download"></i> Загрузить';
+        })
+        .catch(function(err) {
+            alert('Ошибка загрузки шаблона');
+            console.error(err);
+            loadBtn.disabled = false;
+            loadBtn.innerHTML = '<i class="bi bi-download"></i> Загрузить';
+        });
+    });
+
+    function clearAllSteps() {
+        var container = document.getElementById('steps-container');
+        var forms = container.querySelectorAll('.step-form');
+        forms.forEach(function(form) {
+            var deleteCheck = form.querySelector('[name$="-DELETE"]');
+            var idField = form.querySelector('[name$="-id"]');
+            // Существующие в БД — помечаем на удаление
+            if (idField && idField.value && deleteCheck) {
+                deleteCheck.checked = true;
+                form.style.display = 'none';
+            } else {
+                form.remove();
+            }
+        });
+    }
+
+    function populateSteps(steps) {
+        var container = document.getElementById('steps-container');
+        var totalForms = document.getElementById('id_steps-TOTAL_FORMS');
+
+        steps.forEach(function(stepData) {
+            var formIndex = parseInt(totalForms.value);
+            var newForm = createStepForm(formIndex);
+            if (!newForm) return;
+
+            // Заполняем поля
+            setVal(newForm, 'title', stepData.title);
+            setSelect(newForm, 'step_type', stepData.step_type);
+            setVal(newForm, 'instruction', stepData.instruction);
+            setVal(newForm, 'publish_time', stepData.publish_time);
+            setVal(newForm, 'timeout_minutes', stepData.timeout_minutes);
+            setVal(newForm, 'reminder_minutes', stepData.reminder_minutes);
+            setVal(newForm, 'reminder_text', stepData.reminder_text);
+            setCheck(newForm, 'requires_moderation', stepData.requires_moderation);
+            setVal(newForm, 'correct_article', stepData.correct_article);
+            setVal(newForm, 'min_length', stepData.min_length);
+            setVal(newForm, 'choices_text', stepData.choices_text);
+
+            container.appendChild(newForm);
+            totalForms.value = formIndex + 1;
+            toggleConditionalFields(newForm);
+        });
+
+        updateOrder();
+    }
+
+    function createStepForm(index) {
+        // Создаём из сохранённого эталона
+        var wrapper = document.createElement('div');
+        wrapper.innerHTML = templateFormHTML;
+        var newForm = wrapper.firstElementChild;
+
+        newForm.classList.remove('border-danger');
+        newForm.style.display = '';
+
+        // Переиндексируем все поля
+        newForm.querySelectorAll('input, select, textarea').forEach(function(el) {
+            if (el.name) el.name = el.name.replace(/-\d+-/, '-' + index + '-');
+            if (el.id) el.id = el.id.replace(/-\d+-/, '-' + index + '-');
+            if (el.tagName === 'SELECT') {
+                el.selectedIndex = 0;
+            } else if (el.type === 'checkbox') {
+                el.checked = false;
+            } else if (el.type !== 'hidden') {
+                el.value = '';
+            }
+        });
+
+        newForm.querySelectorAll('label').forEach(function(label) {
+            var f = label.getAttribute('for');
+            if (f) label.setAttribute('for', f.replace(/-\d+-/, '-' + index + '-'));
+        });
+
+        // Очищаем id (новая форма, не из БД)
+        var idField = newForm.querySelector('[name$="-id"]');
+        if (idField) idField.value = '';
+
+        // Убираем чекбокс удаления
+        var dc = newForm.querySelector('.delete-check');
+        if (dc) dc.remove();
+
+        // Убираем ошибки валидации
+        newForm.querySelectorAll('.invalid-feedback, .alert-danger').forEach(function(el) { el.remove(); });
+
+        return newForm;
+    }
+
+    function setVal(form, fieldName, value) {
+        var el = form.querySelector('[name$="-' + fieldName + '"]');
+        if (el) el.value = value || '';
+    }
+
+    function setSelect(form, fieldName, value) {
+        var el = form.querySelector('[name$="-' + fieldName + '"]');
+        if (el && value) el.value = value;
+    }
+
+    function setCheck(form, fieldName, checked) {
+        var el = form.querySelector('[name$="-' + fieldName + '"]');
+        if (el) el.checked = !!checked;
+    }
+})();
 </script>
 {% endblock %}
