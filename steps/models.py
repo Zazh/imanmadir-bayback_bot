@@ -92,6 +92,19 @@ class TaskStep(models.Model):
         ordering = ['task', 'order']
         unique_together = ['task', 'order']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_image = self.image.name if self.image else None
+
+    def save(self, *args, **kwargs):
+        if self.image and self.image.name != self._original_image:
+            from core.image_utils import compress_image
+            new_image = compress_image(self.image)
+            if new_image:
+                self.image = new_image
+        super().save(*args, **kwargs)
+        self._original_image = self.image.name if self.image else None
+
     def __str__(self):
         return f'{self.task.title} — Шаг {self.order}'
 
@@ -178,6 +191,19 @@ class StepTemplateItem(models.Model):
         verbose_name_plural = 'Шаги шаблона'
         ordering = ['template', 'order']
         unique_together = ['template', 'order']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_image = self.image.name if self.image else None
+
+    def save(self, *args, **kwargs):
+        if self.image and self.image.name != self._original_image:
+            from core.image_utils import compress_image
+            new_image = compress_image(self.image)
+            if new_image:
+                self.image = new_image
+        super().save(*args, **kwargs)
+        self._original_image = self.image.name if self.image else None
 
     def __str__(self):
         return f'{self.template.name} — Шаг {self.order}'

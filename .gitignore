@@ -79,3 +79,6 @@ coverage.xml
 
 # mypy
 .mypy_cache/
+
+# Claude Code
+.claude/
