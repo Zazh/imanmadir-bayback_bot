@@ -1,9 +1,13 @@
+import logging
+import os
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes, ConversationHandler
 from django.conf import settings
 from django.utils import timezone
-import os
+
+logger = logging.getLogger(__name__)
 
 from bot.reminders import schedule_publish_review_reminders, cancel_buyback_reminders
 from account.models import TelegramUser
@@ -146,22 +150,31 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, buyback:
     keyboard = get_step_keyboard(step, buyback.id)
     chat_id = update.effective_chat.id
 
-    if step.image:
-        with open(step.image.path, 'rb') as photo:
-            await context.bot.send_photo(
+    try:
+        if step.image:
+            with open(step.image.path, 'rb') as photo:
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=photo,
+                    caption=text,
+                    parse_mode='HTML',
+                    reply_markup=keyboard,
+                )
+        else:
+            await context.bot.send_message(
                 chat_id=chat_id,
-                photo=photo,
-                caption=text,
+                text=text,
                 parse_mode='HTML',
                 reply_markup=keyboard,
             )
-    else:
+    except Exception:
+        logger.exception('Ошибка при отправке шага (buyback=%s, step=%s)', buyback.id, step.id)
         await context.bot.send_message(
             chat_id=chat_id,
-            text=text,
-            parse_mode='HTML',
-            reply_markup=keyboard,
+            text='⚠️ Не удалось загрузить шаг. Попробуй ещё раз.',
+            reply_markup=main_menu_keyboard(),
         )
+        return ConversationHandler.END
 
     return WAITING_RESPONSE
 
@@ -214,6 +227,10 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
     if not buyback_id or not step_id:
+        await update.message.reply_text(
+            '⚠️ Сессия устарела. Зайди в «📦 Мои выкупы» и продолжи задание.',
+            reply_markup=main_menu_keyboard(),
+        )
         return ConversationHandler.END
 
     try:
@@ -246,11 +263,16 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return WAITING_RESPONSE
 
         photo = update.message.photo[-1]
-        file = await photo.get_file()
-        file_path = f'buybacks/{buyback_id}/step_{step.order}_{photo.file_id}.jpg'
-        full_path = os.path.join(settings.MEDIA_ROOT, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        await file.download_to_drive(full_path)
+        try:
+            file = await photo.get_file()
+            file_path = f'buybacks/{buyback_id}/step_{step.order}_{photo.file_id}.jpg'
+            full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            await file.download_to_drive(full_path)
+        except Exception:
+            logger.exception('Ошибка при скачивании фото (buyback=%s, step=%s)', buyback_id, step.id)
+            await update.message.reply_text('⚠️ Не удалось загрузить фото. Попробуй отправить ещё раз.')
+            return WAITING_RESPONSE
         user_input = file_path
 
     elif step_type == StepType.PAYMENT_DETAILS:
@@ -259,8 +281,13 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         user_input = update.message.text
 
-    validator = get_validator(step, buyback)
-    result = await validator.validate(user_input)
+    try:
+        validator = get_validator(step, buyback)
+        result = await validator.validate(user_input)
+    except Exception:
+        logger.exception('Ошибка валидации (buyback=%s, step=%s)', buyback_id, step.id)
+        await update.message.reply_text('⚠️ Произошла ошибка. Попробуй ещё раз.')
+        return WAITING_RESPONSE
 
     if not result.is_valid:
         await update.message.reply_text(result.error_message)
@@ -337,35 +364,46 @@ async def handle_payment_input(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def advance_to_next_step(update: Update, context: ContextTypes.DEFAULT_TYPE, buyback: Buyback):
     """Переход к следующему шагу"""
-    task = await Task.objects.aget(id=buyback.task_id)
-    next_step = await task.steps.filter(order__gt=buyback.current_step).order_by('order').afirst()
+    try:
+        task = await Task.objects.aget(id=buyback.task_id)
+        next_step = await task.steps.filter(order__gt=buyback.current_step).order_by('order').afirst()
 
-    if next_step:
-        buyback.current_step = next_step.order
-        await buyback.asave(update_fields=['current_step'])
-        return await show_step(update, context, buyback, next_step)
+        if next_step:
+            buyback.current_step = next_step.order
+            await buyback.asave(update_fields=['current_step'])
+            return await show_step(update, context, buyback, next_step)
 
-    buyback.status = Buyback.Status.PENDING_REVIEW
-    buyback.completed_at = timezone.now()
-    await buyback.asave(update_fields=['status', 'completed_at'])
+        buyback.status = Buyback.Status.PENDING_REVIEW
+        buyback.completed_at = timezone.now()
+        await buyback.asave(update_fields=['status', 'completed_at'])
 
-    text = (
-        '🎉 <b>Все шаги выполнены!</b>\n\n'
-        'Твой выкуп отправлен на проверку.'
-    )
+        text = (
+            '🎉 <b>Все шаги выполнены!</b>\n\n'
+            'Твой выкуп отправлен на проверку.'
+        )
 
-    if update.callback_query:
-        await safe_edit_message(update.callback_query, text, parse_mode='HTML')
+        if update.callback_query:
+            await safe_edit_message(update.callback_query, text, parse_mode='HTML')
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text='Выбери действие:',
+                reply_markup=main_menu_keyboard(),
+            )
+        else:
+            await update.message.reply_text(text, parse_mode='HTML', reply_markup=main_menu_keyboard())
+
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    except Exception:
+        logger.exception('Ошибка при переходе к следующему шагу (buyback=%s)', buyback.id)
+        chat_id = update.effective_chat.id
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text='Выбери действие:',
+            chat_id=chat_id,
+            text='⚠️ Произошла ошибка при переходе к следующему шагу. Попробуй ещё раз.',
             reply_markup=main_menu_keyboard(),
         )
-    else:
-        await update.message.reply_text(text, parse_mode='HTML', reply_markup=main_menu_keyboard())
-
-    context.user_data.clear()
-    return ConversationHandler.END
+        return ConversationHandler.END
 
 
 async def check_step_timeout(buyback, step):
