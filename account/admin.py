@@ -43,7 +43,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
             'fields': ['telegram_id', 'username', 'first_name', 'last_name'],
         }),
         ('Реквизиты для выплат', {
-            'fields': ['phone', 'card_number'],
+            'fields': ['phone', 'bank_name', 'card_holder_name'],
         }),
         ('Статус', {
             'fields': ['is_active', 'is_blocked'],
