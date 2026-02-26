@@ -1,4 +1,5 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes, ConversationHandler
 from django.conf import settings
 from django.utils import timezone
@@ -16,6 +17,18 @@ from bot.keyboards.reply import main_menu_keyboard
 
 # Состояние ConversationHandler
 WAITING_RESPONSE = 1
+
+
+async def safe_edit_message(query, text, parse_mode=None):
+    """edit_message_text не работает для фото-сообщений (у них caption, а не text).
+    Пробуем edit_text, при ошибке — edit_caption."""
+    try:
+        await query.edit_message_text(text, parse_mode=parse_mode)
+    except BadRequest:
+        try:
+            await query.edit_message_caption(caption=text, parse_mode=parse_mode)
+        except BadRequest:
+            pass
 
 
 async def resume_buyback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -342,7 +355,7 @@ async def advance_to_next_step(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode='HTML')
+        await safe_edit_message(update.callback_query, text, parse_mode='HTML')
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text='Выбери действие:',
@@ -378,11 +391,11 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buyback = await Buyback.objects.aget(id=buyback_id)
         step = await TaskStep.objects.aget(task_id=buyback.task_id, order=buyback.current_step)
     except (Buyback.DoesNotExist, TaskStep.DoesNotExist):
-        await query.edit_message_text('⚠️ Ошибка')
+        await safe_edit_message(query, '⚠️ Ошибка')
         return ConversationHandler.END
 
     if await check_step_timeout(buyback, step):
-        await query.edit_message_text('⏰ Время на выполнение этого шага истекло. Выкуп отменён.')
+        await safe_edit_message(query, '⏰ Время на выполнение этого шага истекло. Выкуп отменён.')
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -395,7 +408,7 @@ async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status=BuybackResponse.Status.AUTO_APPROVED,
     )
 
-    await query.edit_message_text('✅ Подтверждено!')
+    await safe_edit_message(query, '✅ Подтверждено!')
 
     return await advance_to_next_step(update, context, buyback)
 
@@ -413,11 +426,11 @@ async def choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buyback = await Buyback.objects.aget(id=buyback_id)
         step = await TaskStep.objects.aget(task_id=buyback.task_id, order=buyback.current_step)
     except (Buyback.DoesNotExist, TaskStep.DoesNotExist):
-        await query.edit_message_text('⚠️ Ошибка')
+        await safe_edit_message(query, '⚠️ Ошибка')
         return ConversationHandler.END
 
     if await check_step_timeout(buyback, step):
-        await query.edit_message_text('⏰ Время на выполнение этого шага истекло. Выкуп отменён.')
+        await safe_edit_message(query, '⏰ Время на выполнение этого шага истекло. Выкуп отменён.')
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -430,7 +443,7 @@ async def choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status=BuybackResponse.Status.AUTO_APPROVED,
     )
 
-    await query.edit_message_text(f'✅ Выбрано: {choice}')
+    await safe_edit_message(query, f'✅ Выбрано: {choice}')
 
     return await advance_to_next_step(update, context, buyback)
 
@@ -445,13 +458,13 @@ async def cancel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         buyback = await Buyback.objects.aget(id=buyback_id)
     except Buyback.DoesNotExist:
-        await query.edit_message_text('⚠️ Выкуп не найден')
+        await safe_edit_message(query, '⚠️ Выкуп не найден')
         return ConversationHandler.END
 
     buyback.status = Buyback.Status.CANCELLED
     await buyback.asave(update_fields=['status'])
 
-    await query.edit_message_text('❌ Выкуп отменён')
+    await safe_edit_message(query, '❌ Выкуп отменён')
 
     context.user_data.clear()
     return ConversationHandler.END
