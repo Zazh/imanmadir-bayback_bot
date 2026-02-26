@@ -210,6 +210,9 @@ class BuybackListView(StaffRequiredMixin, View):
         status = request.GET.get('status', '')
         if status:
             qs = qs.filter(status=status)
+        step = request.GET.get('step', '')
+        if step:
+            qs = qs.filter(current_step=step)
         q = request.GET.get('q', '')
         if q:
             qs = qs.filter(
@@ -217,13 +220,16 @@ class BuybackListView(StaffRequiredMixin, View):
                 Q(user__username__icontains=q) |
                 Q(user__first_name__icontains=q)
             )
+        steps = Buyback.objects.values_list('current_step', flat=True).distinct().order_by('current_step')
         paginator = Paginator(qs, 20)
         page = paginator.get_page(request.GET.get('page'))
         return render(request, 'backoffice/buybacks/list.html', {
             'page': page,
             'current_status': status,
+            'current_step': step,
             'q': q,
             'statuses': Buyback.Status.choices,
+            'steps': steps,
         })
 
 

@@ -21,6 +21,14 @@
         </select>
       </div>
       <div class="col-auto">
+        <select name="step" class="form-select form-select-sm">
+          <option value="">Все шаги</option>
+          {% for s in steps %}
+          <option value="{{ s }}" {% if current_step == s|stringformat:"d" %}selected{% endif %}>Шаг {{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
         <button class="btn btn-sm btn-outline-secondary">Фильтр</button>
       </div>
     </form>
