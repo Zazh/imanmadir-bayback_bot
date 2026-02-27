@@ -174,6 +174,7 @@ class TaskEditView(StaffRequiredMixin, View):
         task = get_object_or_404(Task, pk=pk)
         form = TaskForm(instance=task)
         formset = TaskStepFormSet(instance=task)
+        formset.extra = 0
         return render(request, 'backoffice/tasks/form.html', {
             'form': form, 'formset': formset, 'task': task,
             'step_templates': self._get_step_templates(),
@@ -187,6 +188,7 @@ class TaskEditView(StaffRequiredMixin, View):
             form.save()
             formset.save()
             return redirect('backoffice:task_detail', pk=task.pk)
+        formset.extra = 0
         return render(request, 'backoffice/tasks/form.html', {
             'form': form, 'formset': formset, 'task': task,
             'step_templates': self._get_step_templates(),
