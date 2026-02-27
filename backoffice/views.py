@@ -548,6 +548,12 @@ class BonusUserListView(StaffRequiredMixin, View):
                     bonus_messages__is_read=False,
                 ),
             ),
+            manager_msg_count=Count(
+                'bonus_messages',
+                filter=Q(
+                    bonus_messages__sender_type=BonusMessage.SenderType.MANAGER,
+                ),
+            ),
         )
         q = request.GET.get('q', '')
         if q:
@@ -557,10 +563,21 @@ class BonusUserListView(StaffRequiredMixin, View):
                 Q(last_name__icontains=q) |
                 Q(telegram_id__icontains=q)
             )
+
+        filter_type = request.GET.get('filter', '')
+        if filter_type == 'unread':
+            qs = qs.filter(unread_bonus__gt=0)
+        elif filter_type == 'sent':
+            qs = qs.filter(manager_msg_count__gt=0)
+        elif filter_type == 'no_messages':
+            qs = qs.filter(bonus_msg_count=0)
+
+        qs = qs.order_by('-unread_bonus', '-created_at')
+
         paginator = Paginator(qs, 20)
         page = paginator.get_page(request.GET.get('page'))
         return render(request, 'backoffice/bonus/user_list.html', {
-            'page': page, 'q': q,
+            'page': page, 'q': q, 'filter_type': filter_type,
         })
 
 

@@ -117,14 +117,16 @@
     {% endfor %}
   </div>
   <div class="card-footer bg-white">
-    <form method="post" action="{% url 'backoffice:bonus_chat_send' tg_user.pk %}" class="d-flex gap-2">
+    <form method="post" action="{% url 'backoffice:bonus_chat_send' tg_user.pk %}" class="d-flex gap-2 align-items-end" id="chat-form">
       {% csrf_token %}
-      <input type="text" name="message" class="form-control"
-             placeholder="Написать в бонус-бот..." autocomplete="off" required>
+      <textarea name="message" class="form-control" id="chat-input" rows="1"
+                placeholder="Написать в бонус-бот..." required
+                style="resize: none; max-height: 150px; overflow-y: auto;"></textarea>
       <button type="submit" class="btn btn-primary">
         <i class="bi bi-send"></i>
       </button>
     </form>
+    <div class="text-muted small mt-1">Enter — отправить, Ctrl+Enter — перенос строки</div>
   </div>
 </div>
 {% endif %}
@@ -136,6 +138,29 @@
     const chatBox = document.getElementById('chat-messages');
     if (!chatBox) return;
     chatBox.scrollTop = chatBox.scrollHeight;
+
+    const chatInput = document.getElementById('chat-input');
+    const chatForm = document.getElementById('chat-form');
+    if (chatInput) {
+        chatInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                if (this.value.trim()) {
+                    chatForm.submit();
+                }
+            } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + '\n' + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 1;
+                this.dispatchEvent(new Event('input'));
+            }
+        });
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+        });
+    }
 
     let lastMessageId = {{ last_message_id|default:"0" }};
 

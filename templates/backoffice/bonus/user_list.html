@@ -9,12 +9,31 @@
 
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-white">
-    <form method="get" class="d-flex gap-2">
+    <form method="get" class="d-flex gap-2 mb-3">
       <input type="text" name="q" class="form-control form-control-sm" style="max-width: 300px;"
              placeholder="Поиск по имени, username, ID..." value="{{ q }}">
+      {% if filter_type %}<input type="hidden" name="filter" value="{{ filter_type }}">{% endif %}
       <button class="btn btn-sm btn-outline-primary">Найти</button>
-      {% if q %}<a href="{% url 'backoffice:bonus_user_list' %}" class="btn btn-sm btn-outline-secondary">Сбросить</a>{% endif %}
+      {% if q or filter_type %}<a href="{% url 'backoffice:bonus_user_list' %}" class="btn btn-sm btn-outline-secondary">Сбросить</a>{% endif %}
     </form>
+    <div class="d-flex gap-2">
+      <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}"
+         class="btn btn-sm {% if not filter_type %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        Все
+      </a>
+      <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}filter=unread"
+         class="btn btn-sm {% if filter_type == 'unread' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+        Непрочитанные
+      </a>
+      <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}filter=sent"
+         class="btn btn-sm {% if filter_type == 'sent' %}btn-success{% else %}btn-outline-success{% endif %}">
+        Отправленные
+      </a>
+      <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}filter=no_messages"
+         class="btn btn-sm {% if filter_type == 'no_messages' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Нет сообщений
+      </a>
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0">
@@ -24,12 +43,13 @@
           <th>Telegram ID</th>
           <th>Сообщений</th>
           <th>Непрочитанных</th>
+          <th>Дата старта</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         {% for u in page %}
-        <tr>
+        <tr{% if u.unread_bonus %} class="table-warning"{% endif %}>
           <td>
             {{ u.first_name }} {{ u.last_name }}
             {% if u.username %}<span class="text-muted">@{{ u.username }}</span>{% endif %}
@@ -43,6 +63,7 @@
             <span class="text-muted">0</span>
             {% endif %}
           </td>
+          <td class="text-muted small">{{ u.created_at|date:"d.m.Y H:i" }}</td>
           <td>
             <a href="{% url 'backoffice:bonus_chat' u.pk %}" class="btn btn-sm btn-outline-primary">
               <i class="bi bi-chat-dots"></i> Чат
@@ -50,7 +71,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-center text-muted py-4">Нет пользователей</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">Нет пользователей</td></tr>
         {% endfor %}
       </tbody>
     </table>
